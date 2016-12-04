@@ -242,6 +242,7 @@ void SP_path_corner( gentity_t *self );
 void SP_misc_teleporter_dest( gentity_t *self );
 void SP_misc_model( gentity_t *ent );
 void SP_misc_model_static( gentity_t *ent );
+void SP_misc_model_breakable( gentity_t *ent );
 void SP_misc_G2model( gentity_t *ent );
 void SP_misc_portal_camera( gentity_t *ent );
 void SP_misc_portal_surface( gentity_t *ent );
@@ -259,6 +260,7 @@ void SP_misc_model_ammo_power_converter( gentity_t *ent );
 void SP_misc_model_health_power_converter( gentity_t *ent );
 
 void SP_fx_runner( gentity_t *ent );
+void SP_fx_runner_S( gentity_t *ent );
 
 void SP_target_screenshake( gentity_t *ent );
 void SP_target_escapetrig( gentity_t *ent );
@@ -634,6 +636,7 @@ spawn_t	spawns[] = {
 	{ "func_wall", SP_func_wall },
 	{ "fx_rain", SP_CreateRain },
 	{ "fx_runner", SP_fx_runner },
+	{ "fx_runner_s", SP_fx_runner_S },
 	{ "fx_snow", SP_CreateSnow },
 	{ "fx_spacedust", SP_CreateSpaceDust },
 	{ "fx_wind", SP_CreateWind },
@@ -668,6 +671,7 @@ spawn_t	spawns[] = {
 	{ "misc_maglock", SP_misc_maglock },
 	{ "misc_model", SP_misc_model },
 	{ "misc_model_ammo_power_converter", SP_misc_model_ammo_power_converter },
+	{ "misc_model_breakable", SP_misc_model_breakable },
 	{ "misc_model_health_power_converter", SP_misc_model_health_power_converter },
 	{ "misc_model_shield_power_converter", SP_misc_model_shield_power_converter },
 	{ "misc_model_static", SP_misc_model_static },

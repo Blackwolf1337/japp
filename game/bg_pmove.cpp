@@ -3238,6 +3238,9 @@ void PM_GrappleSwing( void ) {
 
 	pml.groundPlane = qfalse;
 
+	//RAZTODO: Play animation, similar to force jump animation playing
+	//	sub_2001AB20();
+
 	VectorSet(&facingAngles, 0, pm->ps->viewangles.yaw, 0);
 
 	AngleVectors(&facingAngles, &facingFwd, &facingRight, NULL);
@@ -5186,7 +5189,7 @@ static void PM_Footsteps( void ) {
 					}
 					else {
 						//desiredAnim = BOTH_RUNBACK_STAFF;
-						//hmm.. stuff runback anim is pretty messed up for some reason.
+						//hmm.. staff runback anim is pretty messed up for some reason.
 						desiredAnim = BOTH_RUNBACK2;
 					}
 					break;
@@ -8753,7 +8756,6 @@ void PM_VehicleViewAngles( playerState_t *ps, bgEntity_t *veh, usercmd_t *ucmd )
 #endif //VEH_CONTROL_SCHEME_4
 		{//only if not if doing special free-roll/pitch control
 			setAngles = qtrue;
-			clampMin.pitch = -pVeh->m_pVehicleInfo->lookPitch;
 			clampMax.pitch = pVeh->m_pVehicleInfo->lookPitch;
 			clampMin.yaw = clampMax.yaw = 0;
 			clampMin.roll = clampMax.roll = -1;

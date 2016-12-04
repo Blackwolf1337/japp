@@ -7,6 +7,9 @@
 #include "bg_lua.h"
 #include "bg_public.h"
 #include "JAPP/jp_csflags.h"
+#include "cJSON/cJSON.h"
+#include <array>
+#include "slre/slre.h"
 
 //rww - for getting bot commands...
 int AcceptBotCommand( char *cmd, gentity_t *pl );
@@ -1048,7 +1051,12 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, char color, con
 	}
 
 	// only send admin messages to other admins and yourself
-	if ( mode == SAY_ADMIN && !other->client->pers.adminUser && ent != other ) {
+	if ( mode == SAY_ADMIN && (!other->client->pers.adminUser || other->client->pers.adminUser->rank < 1) && ent != other ) {
+		return;
+	}
+
+	// only send clan message to the same password
+	if ( mode == SAY_CLAN && (Q_stricmp(ent->client->pers.clanpass, other->client->pers.clanpass) || !Q_stricmp(ent->client->pers.clanpass, "")) && ent != other ) {
 		return;
 	}
 
@@ -1082,6 +1090,48 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, char color, con
 #define ADMIN_EC	"\x11"
 #define PRIVATE_EC	"\x12"
 
+enum adminRanks_e {
+	ADMIN_USER = 0,
+	ADMIN_TRIAL,
+	ADMIN_OPERATOR,
+	ADMIN_MODERATOR,
+	ADMIN_GAMEMASTER,
+	ADMIN_ADMINISTRATOR,
+	ADMIN_SPECIAL,
+	ADMIN_DEVELOPER,
+	ADMIN_HOSTER,
+	ADMIN_OWNER,
+
+	ADMIN_MAX
+};
+
+static std::array<std::string, ADMIN_MAX> adminRanksShort = { {
+		"" S_COLOR_WHITE	"User",
+		"" S_COLOR_WHITE	"{" S_COLOR_CYAN "T" S_COLOR_WHITE "}",
+		"" S_COLOR_WHITE	"{" S_COLOR_BLUE "OP" S_COLOR_WHITE "}",
+		"" S_COLOR_WHITE	"{" S_COLOR_GREEN "MOD" S_COLOR_WHITE "}",
+		"" S_COLOR_WHITE	"{" S_COLOR_RED "GM" S_COLOR_WHITE "}",
+		"" S_COLOR_WHITE	"{" S_COLOR_RED "ADM" S_COLOR_WHITE "}",
+		"" S_COLOR_YELLOW	"-VIP-",
+		"" S_COLOR_RED		"DEV",
+		"" S_COLOR_RED		"HOST",
+		"" S_COLOR_BLUE		"F " S_COLOR_WHITE "OUNDER"
+} };
+
+static std::array<std::string, ADMIN_MAX> adminRanks = { {
+		"" S_COLOR_WHITE	"User" S_COLOR_WHITE "",
+		"" S_COLOR_CYAN		"Trial" S_COLOR_WHITE "",
+		"" S_COLOR_BLUE		"Operator" S_COLOR_WHITE "",
+		"" S_COLOR_GREEN	"Moderator" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"GameMaster" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Administrator" S_COLOR_WHITE "",
+		"" S_COLOR_YELLOW	"Very Important Person" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Developer" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Hoster" S_COLOR_WHITE "",
+		"" S_COLOR_MAGENTA	"Founder" S_COLOR_WHITE ""
+		} };
+
+#define DISCORD		"discord.json"
 static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ) {
 	int			i;
 	gentity_t	*other;
@@ -1092,7 +1142,20 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	char		location[64];
 	char		*locMsg = NULL;
 	qboolean	isMeCmd = qfalse;
+	qboolean	isDiscordCmd = qfalse;
 	qboolean	returnToSender = qfalse;
+	char *buf = NULL;
+	unsigned int len = 0;
+	fileHandle_t f = 0;
+	//DISCORD->:
+	cJSON		*root		= NULL,
+				*users		= NULL;
+	const char	*invite		= NULL,
+				*svname		= NULL;
+	int			usersCounts = 0;
+	char		sv[128],
+				in[128];
+	bool		passtojson;
 
 	if ( level.gametype < GT_TEAM && mode == SAY_TEAM ) {
 		mode = SAY_ALL;
@@ -1103,37 +1166,136 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	}
 
 	//RAZTODO: strip ext ascii/control chars
-	if ( strstr( ent->client->pers.netname, "<Admin>" ) || Q_strchrs( chatText, "\n\r\x0b" ) ) {
+	if ( strstr( ent->client->pers.netname, "<Admin>" ) || 
+		 strstr( ent->client->pers.netname, "<Clan>")	|| 
+		 Q_strchrs( chatText, "\n\r\x0b" ) ) {
 		returnToSender = qtrue;
 	}
 
 	switch ( mode ) {
 	default:
 	case SAY_ADMIN:
-		G_LogPrintf( level.log.console, "amsay: %s: %s\n", ent->client->pers.netname, chatText );
+		G_LogPrintf( level.log.chat, "amsay: %s: %s\n", ent->client->pers.netname, chatText );
 		Com_sprintf( name, sizeof(name), S_COLOR_YELLOW"<Admin>" S_COLOR_WHITE "%s%c%c" EC ": ",
 			ent->client->pers.netname, Q_COLOR_ESCAPE, COLOR_WHITE
 		);
 		color = COLOR_YELLOW;
+		break;
+	case SAY_CLAN:
+		G_LogPrintf( level.log.chat, "clansay(%s): %s: %s\n", ent->client->pers.clanpass, ent->client->pers.netname, chatText );
+		Com_sprintf( name, sizeof(name), S_COLOR_RED"<Clan>" S_COLOR_WHITE "%s%c%c" EC ": ", 
+			ent->client->pers.netname,
+			Q_COLOR_ESCAPE,
+			COLOR_WHITE
+		);
+		color = COLOR_RED;
 		break;
 	case SAY_ALL:
 		if ( !Q_stricmpn( chatText, "/me ", 4 ) ) {
 			// A /me command
 			isMeCmd = qtrue;
 			chatText += 4; //Skip "^7* "
+
+			G_LogPrintf(level.log.chat, "me: %s %s\n", ent->client->pers.netname, chatText);
+
+			if (isMeCmd) {
+				Com_sprintf(name, sizeof(name), S_COLOR_WHITE "* %s" S_COLOR_WHITE EC " ", ent->client->pers.netname);
+				color = COLOR_WHITE;
+			}
+
 		}
-		G_LogPrintf( level.log.console, "say: %s: %s\n", ent->client->pers.netname, chatText );
-		if ( isMeCmd ) {
-			Com_sprintf( name, sizeof(name), S_COLOR_WHITE "* %s" S_COLOR_WHITE EC " ", ent->client->pers.netname );
-			color = COLOR_WHITE;
+
+		else if (ent->client->pers.adminData.isTag && ent->client->pers.adminUser->rank > 0) {
+			if (ent->client->pers.adminUser->isCustomRank) {
+				G_LogPrintf( level.log.chat, "say: %s %s: %s\n", ent->client->pers.adminUser->customRanks, ent->client->pers.netname, chatText);
+				Com_sprintf(name, sizeof(name) + sizeof(ent->client->pers.adminUser->customRanks), "%s " S_COLOR_WHITE "%s%c%c" EC ": ", ent->client->pers.adminUser->customRanks, ent->client->pers.netname, Q_COLOR_ESCAPE, COLOR_WHITE
+					);
+			}
+			else {
+				G_LogPrintf( level.log.chat, "say: %s %s: %s\n", adminRanksShort[ent->client->pers.adminUser->rank].c_str(), ent->client->pers.netname, chatText);
+				Com_sprintf(name, sizeof(name) + sizeof(adminRanksShort[ent->client->pers.adminUser->rank].c_str()), "%s " S_COLOR_WHITE "%s%c%c" EC ": ", adminRanksShort[ent->client->pers.adminUser->rank].c_str(), ent->client->pers.netname, Q_COLOR_ESCAPE, COLOR_WHITE
+					);
+			}
+			color = COLOR_GREEN;
 		}
+
+		else if (!Q_stricmpn( chatText, "!discord", 8)) {
+			// A Discord status recieve command
+			isDiscordCmd = qtrue;
+			chatText += strlen( chatText );
+
+			G_LogPrintf( level.log.chat, "say: %s: %s\n", ent->client->pers.netname, chatText);
+
+			if (isDiscordCmd) {
+				len = trap->FS_Open(DISCORD, &f, FS_READ);
+				trap->Print("Loading admin accounts (" DISCORD ")\n");
+
+				// no file
+				if (!f) {
+					return;
+				}
+
+				// empty file
+				if (!len || len == -1) {
+					trap->FS_Close(f);
+					return;
+				}
+
+				// alloc memory for buffer
+				if (!(buf = (char*)malloc(len + 1))) {
+					return;
+				}
+
+				trap->FS_Read(buf, len, f);
+				trap->FS_Close(f);
+				buf[len] = 0;
+
+				passtojson = true;
+
+				// pass it off to the json reader
+				if (passtojson)
+				{
+					root = cJSON_Parse(buf);
+					if (!root) {
+						Com_Printf("ERROR: Could not parse Discord Data\n");
+						Com_sprintf(name, sizeof(name), S_COLOR_RED "* " S_COLOR_WHITE " ERROR: Could not parse Discord Data, excuse us.");
+						color = COLOR_WHITE;
+						return;
+					}
+
+					//Z�hlt Nutzer
+					users = cJSON_GetObjectItem(root, "members");
+					usersCounts = cJSON_GetArraySize(users);
+
+					//Instant Invite + Servername
+					svname = cJSON_ToString(cJSON_GetItemExt(root, "name"));
+					invite = cJSON_ToString(cJSON_GetItemExt(root, "instant_invite"));
+
+					Com_sprintf(name, sizeof(name), S_COLOR_RED "* " S_COLOR_WHITE "DISCORD: %s | USERS: %d | INVITE: %s" ,
+						strncpy(sv, svname, sizeof(sv)),
+						usersCounts,
+						strncpy(in, invite, sizeof(in)));
+					color = COLOR_WHITE;
+
+					cJSON_Delete(root);
+
+					passtojson = false;
+				}
+
+				free(buf);
+
+			}
+
+		}
+
 		else {
+			G_LogPrintf( level.log.chat, "say: %s: %s\n", ent->client->pers.netname, chatText);
 			Com_sprintf( name, sizeof(name), "%s" S_COLOR_WHITE EC ": ", ent->client->pers.netname );
 			color = COLOR_GREEN;
 		}
 		break;
 	case SAY_TEAM:
-		G_LogPrintf( level.log.console, "sayteam: %s: %s\n", ent->client->pers.netname, chatText );
+		G_LogPrintf( level.log.chat, "sayteam: %s: %s\n", ent->client->pers.netname, chatText );
 		if ( Team_GetLocationMsg( ent, location, sizeof(location) ) ) {
 			Com_sprintf( name, sizeof(name), EC "(%s%c%c" EC ")" EC ": ", ent->client->pers.netname, Q_COLOR_ESCAPE,
 				COLOR_WHITE
@@ -1184,27 +1346,58 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	}
 }
 
-static void Cmd_Say_f( gentity_t *ent ) {
+enum TalkAnims_e {
+	TALK_0 = 0,
+	TALk_1,
+	TALK_2,
+
+	TALK_MAX
+};
+
+static std::array<std::int32_t, TALK_MAX> TalkAnims = { {
+	BOTH_STAND1_TALK1,
+	BOTH_STAND1_TALK2,
+	BOTH_STAND1_TALK3,
+} };
+
+
+static void Cmd_Say_f(gentity_t *ent) {
 	char *p = NULL;
 	char *res = NULL;
 	chatType_t type = SAY_ALL;
+	animNumber_t talk = (animNumber_t)TalkAnims[Q_irand(0, 2)];
 
-	if ( trap->Argc() < 2 ) {
+	if (trap->Argc() < 2) {
 		return;
 	}
 
-	p = ConcatArgs( 1 );
+	p = ConcatArgs(1);
 
 	//Raz: BOF
-	if ( strlen( p ) > MAX_SAY_TEXT ) {
+	if (strlen(p) > MAX_SAY_TEXT) {
 		p[MAX_SAY_TEXT - 1] = '\0';
-		G_LogPrintf( level.log.security, "Cmd_Say_f from %d (%s) has been truncated: %s\n", ent->s.number, ent->client->pers.netname, p );
+		G_LogPrintf( level.log.security, "Cmd_Say_f from %d (%s) has been truncated: %s\n", ent->s.number, ent->client->pers.netname, p);
 	}
-	if ((res = JPLua::Event_ChatMessageRecieved(ent->s.number, p, type))){
+	if ((res = JPLua::Event_ChatMessageRecieved(ent->s.number, p, type))) {
 		G_Say(ent, NULL, type, res);
 	}
-	else{
+	else {
 		G_Say(ent, NULL, type, p);
+	}
+
+	if (japp_allowChatAnimations.integer) 
+	{
+		if (ent->client->ps.weaponTime > 0 || ent->client->ps.saberMove > LS_READY || ent->client->ps.fd.forcePowersActive
+			|| ent->client->ps.groundEntityNum == ENTITYNUM_NONE || ent->client->ps.duelInProgress
+			|| BG_InKnockDown(ent->client->ps.legsAnim) || BG_InRoll(&ent->client->ps, ent->client->ps.legsAnim)
+			|| ent->client->ps.forceHandExtend != HANDEXTEND_NONE || ent->client->emote.freeze)
+		{
+			return;
+		}
+
+		ent->client->ps.forceHandExtend = HANDEXTEND_TAUNT;
+		ent->client->ps.forceHandExtendTime = level.time + BG_AnimLength(ent->localAnimIndex, talk);
+		ent->client->ps.forceDodgeAnim = talk;
 	}
 }
 
@@ -1231,6 +1424,60 @@ static void Cmd_SayAdmin_f( gentity_t *ent ) {
 	}
 }
 
+static void Cmd_SayClan_f(gentity_t *ent) {
+	char *p = NULL;
+	char *res = NULL;
+	chatType_t type = SAY_CLAN;
+
+	if (trap->Argc() < 2) {
+		return;
+	}
+
+	p = ConcatArgs(1);
+
+	if (strlen(p) > MAX_SAY_TEXT) {
+		p[MAX_SAY_TEXT - 1] = '\0';
+		G_LogPrintf(level.log.security, "Cmd_SayClan_f from %d (%s) has been truncated: %s\n", ent->s.number, ent->client->pers.netname, p);
+	}
+	if ((res = JPLua::Event_ChatMessageRecieved(ent->s.number, p, type))) {
+		G_Say(ent, NULL, type, res);
+	}
+	else {
+		G_Say(ent, NULL, type, p);
+	}
+}
+
+static void Cmd_SetClanpass_f( gentity_t *ent ) {
+	char *p = NULL;
+	
+	if (trap->Argc() < 2) {
+		return;
+	}
+
+	p = ConcatArgs(1);
+
+	strncpy(ent->client->pers.clanpass, p, sizeof(ent->client->pers.clanpass));
+	trap->SendServerCommand(ent - g_entities, va("print \"^1Clanpass set to ^7%s\n^1Use ^2cp_clanPwd ^7to set ur password permanently\n\"", ent->client->pers.clanpass));
+}
+
+static void Cmd_ClanWhoIs_f( gentity_t *ent ) {
+	int i;
+	gentity_t *o = NULL;
+
+	trap->SendServerCommand( ent - g_entities, "print \"^1Clanwhois Print out:^7\n\"" );
+	for (i = 0, o = g_entities; i < level.maxclients; i++, o++) 
+	{
+		if (!Q_stricmp(ent->client->pers.clanpass, ""))
+			return;
+
+		if (!Q_stricmp(ent->client->pers.clanpass, o->client->pers.clanpass)) {
+			trap->SendServerCommand(ent - g_entities, va("print \"^7(^5%i^7): %s | %s\n\"", o->s.number,
+																							o->client->pers.netname,
+																							o->client->pers.netnameClean));
+		}
+	}
+}
+
 static void Cmd_SayTeam_f( gentity_t *ent ) {
 	char *p = NULL;
 	char *res = NULL;
@@ -1250,9 +1497,15 @@ static void Cmd_SayTeam_f( gentity_t *ent ) {
 	if ((res = JPLua::Event_ChatMessageRecieved(ent->s.number, p, type))){
 		Q_strncpyz(p, res, MAX_SAY_TEXT);
 	}
+
 	if ( ent->client->pers.sayTeamMethod == STM_ADMIN ) {
 		type = SAY_ADMIN;
 	}
+
+	if (ent->client->pers.sayTeamMethod == STM_CLAN) {
+		type = SAY_CLAN;
+	}
+
 	else if ( ent->client->pers.sayTeamMethod == STM_CENTERPRINT ) {
 		if ( ent->client->pers.adminUser && AM_HasPrivilege( ent, PRIV_ANNOUNCE ) ) {
 			Q_ConvertLinefeeds( p );
@@ -1269,7 +1522,8 @@ static void Cmd_SayTeam_f( gentity_t *ent ) {
 static const char *sayTeamMethods[STM_NUM_METHODS] = {
 	"team",
 	"admin",
-	"centerprint"
+	"centerprint",
+	"clan",
 };
 
 static void Cmd_SayTeamMod_f( gentity_t *ent ) {
@@ -1325,12 +1579,37 @@ static void Cmd_Tell_f( gentity_t *ent ) {
 		G_LogPrintf( level.log.security, "Cmd_Tell_f from %d (%s) has been truncated: %s\n", ent->s.number, ent->client->pers.netname, p );
 	}
 
-	G_LogPrintf( level.log.console, "tell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, p );
+	G_LogPrintf( level.log.chat, "tell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, p );
 	G_Say( ent, target, SAY_TELL, p );
 	// don't tell to the player self if it was already directed to this player
 	// also don't send the chat back to a bot
 	if ( ent != target && !(ent->r.svFlags & SVF_BOT) )
 		G_Say( ent, ent, SAY_TELL, p );
+
+	int			i;
+	gentity_t	*e;
+	for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+
+		if (e->client->pers.adminData.isListening) {
+
+			if (e->client->pers.connected == CON_DISCONNECTED) {
+				continue;
+			}
+
+			if ( targetNum == (e - g_entities) ) {
+				break;
+			}
+
+			if (e->client->pers.adminData.isListeningC) {
+				trap->SendServerCommand(e - g_entities, va("chat \"^6[%s ^1-> %s^6]^7: ^6%s^7\"", ent->client->pers.netname, target->client->pers.netname, p));
+				return;
+			}
+
+			trap->SendServerCommand(e - g_entities, va("print \"^6[^7%s ^1-> ^7%s^7: ^7%s^6]^7\n\"",ent->client->pers.netnameClean,
+																						   target->client->pers.netnameClean,
+																						   p));
+		}
+	}
 }
 
 //siege voice command
@@ -2143,6 +2422,103 @@ void Cmd_ToggleSaber_f( gentity_t *ent ) {
 				G_Sound( ent, CHAN_AUTO, ent->client->saber[0].soundOff );
 			if ( ent->client->saber[1].soundOff && ent->client->saber[1].model[0] )
 				G_Sound( ent, CHAN_AUTO, ent->client->saber[1].soundOff );
+			// prevent anything from being done for 400ms after holster
+			ent->client->ps.weaponTime = 400;
+		}
+	}
+}
+
+//Wolf:
+//FIX:
+//Related command -> amflip
+//WHY DOES THIS FUCKING PIECE OF SHIT CRASH!?
+/*
+----------------------------------------
+Disassembly/Source code
+----------------------------------------
+Crash location located at 0x0D45D700: OJK4567.tmp::Z15PM_SetSaberMoves(+0x350) [Func at 0x0D45D3B0]
+No source code information available
+
+^^^^^^^^^^
+0x0D45D6CD - call 0xd446300                 (Z17PM_SaberInReflecti)
+0x0D45D6D2 - test eax, eax
+0x0D45D6D4 - mov ecx, [esp+0x1c]
+0x0D45D6D8 - jz dword ptr 0xd45dbd3         (Z15PM_SetSaberMoves+0x823) 
+0x0D45D6DE - o16 nop
+0x0D45D6E0 - mov eax, [0xe366f04]
+0x0D45D6E5 - jmp 0xd45d586
+0x0D45D6EA - lea esi, [esi+0x0]
+0x0D45D6F0 - imul edx, [ebp+0xac], 0x710
+0x0D45D6FA - add edx, 0xe605f40
+
+=============================================
+0x0D45D700 - mov edi, [edx+0x374]           <-- Exception
+=============================================
+
+0x0D45D706 - test edi, edi
+0x0D45D708 - jnz 0xd45d770                  (Z15PM_SetSaberMoves+0x3C0)
+0x0D45D70A - mov edx, [ebp+0x4e4]
+0x0D45D710 - cmp edx, 0x7
+0x0D45D713 - jz dword ptr 0xd45db1e         (Z15PM_SetSaberMoves+0x76E)
+0x0D45D719 - cmp edx, 0x6
+0x0D45D71C - jnz dword ptr 0xd45d96b        (Z15PM_SetSaberMoves+0x5BB)
+0x0D45D722 - xor ebp, ebp
+0x0D45D724 - mov edi, 0x362
+0x0D45D729 - mov eax, [eax]
+vvvvvvvvvv
+
+----------------------------------------
+Backtrace
+----------------------------------------
+OJK4567.tmp::Z15PM_SetSaberMoves(+0x350) [0x0D45D700]
+OJK4567.tmp::Z9Q_stricmpPKcS0_(+0x27) [0x0D556EC7]
+OJK4567.tmp::Z13ClientCommandi(+0x1D0) [0x0D494B30]
+openjkded.x86.exe [0x00D5389E]
+*/
+
+void PM_SetSaberMove(short newMove);
+void Cmd_ToggleSaberJK2_f(gentity_t *ent) {
+	// if they are being gripped, don't let them unholster their saber
+	if (ent->client->ps.fd.forceGripCripple && ent->client->ps.saberHolstered)
+		return;
+
+	if (ent->client->ps.saberInFlight) {
+		// turn it off in midair
+		if (ent->client->ps.saberEntityNum)
+			saberKnockDown(&g_entities[ent->client->ps.saberEntityNum], ent, ent);
+		return;
+	}
+
+	if (ent->client->ps.forceHandExtend != HANDEXTEND_NONE)
+		return;
+
+	if (ent->client->ps.weapon != WP_SABER)
+		return;
+
+	if (ent->client->ps.duelTime >= level.time)
+		return;
+
+	if (ent->client->ps.saberLockTime >= level.time)
+		return;
+
+	if (ent->client && ent->client->ps.weaponTime < 1) {
+		if (ent->client->ps.saberHolstered == 2) {
+			PM_SetSaberMove(LS_DRAW);
+			ent->client->ps.saberHolstered = 0;
+
+			if (ent->client->saber[0].soundOn)
+				G_Sound(ent, CHAN_AUTO, ent->client->saber[0].soundOn);
+			if (ent->client->saber[1].soundOn)
+				G_Sound(ent, CHAN_AUTO, ent->client->saber[1].soundOn);
+			ent->client->ps.weaponTime = 400;
+		}
+		else {
+			PM_SetSaberMove( LS_PUTAWAY );
+			ent->client->ps.saberHolstered = 2;
+			if (ent->client->saber[0].soundOff)
+				G_Sound(ent, CHAN_AUTO, ent->client->saber[0].soundOff);
+			if (ent->client->saber[1].soundOff && ent->client->saber[1].model[0])
+				G_Sound(ent, CHAN_AUTO, ent->client->saber[1].soundOff);
 			// prevent anything from being done for 400ms after holster
 			ent->client->ps.weaponTime = 400;
 		}
@@ -3218,21 +3594,66 @@ static void Cmd_Drop_f( gentity_t *ent ) {
 #define EXTINFO_SABER	(0x0001u)
 #define EXTINFO_CMDS	(0x0002u)
 #define EXTINFO_CLIENT	(0x0004u)
-#define EXTINFO_ALL		(0x0007u)
+#define EXTINFO_ADMIN   (0x0008u)
+#define EXTINFO_ALL		(0x0009u)
 
 static struct amInfoSetting_s {
 	const char *str;
 	uint32_t bit;
 } aminfoSettings[] = {
 	{ "all", EXTINFO_ALL },
-	{ "saber", EXTINFO_SABER },
+	//{ "saber", EXTINFO_SABER },
 	{ "cmds", EXTINFO_CMDS },
 	{ "client", EXTINFO_CLIENT },
+	{ "admin", EXTINFO_ADMIN },
+	{ "saber", EXTINFO_SABER },
 };
 static const size_t numAminfoSettings = ARRAY_LEN( aminfoSettings );
 
 static void PB_Callback( const char *buffer, int clientNum ) {
 	trap->SendServerCommand( clientNum, va( "print \"%s\"", buffer ) );
+}
+
+/*
+Description: Print file in client console.
+Return:      File content.
+Author:      spinaLcord
+			 Blackwolf
+			 Ja++ Contributors
+*/
+#define NEWSFILE "news.txt"
+void PrintFile(printBufferSession_t* pb) {
+	char *buf = NULL;
+	unsigned long int len = 0;
+	fileHandle_t f;
+
+	len = trap->FS_Open( NEWSFILE, &f, FS_READ );
+
+	// if not existing
+	if ( !f )
+	{
+		return;
+	}
+
+	// empty file
+	if ( !len || len == -1 ) {
+		trap->FS_Close( f );
+		return;
+	}
+
+	// alloc memory for buffer
+	if (!(buf = (char*)malloc(len + 1))) {
+		return;
+	}
+
+	trap->FS_Read( buf, len, f );
+	trap->FS_Close( f );
+
+	buf[len] = 0;
+
+	Q_PrintBuffer( pb, buf );
+
+	free( buf );
 }
 
 static void Cmd_AMInfo_f( gentity_t *ent ) {
@@ -3246,15 +3667,24 @@ static void Cmd_AMInfo_f( gentity_t *ent ) {
 
 	if ( trap->Argc() < 2 ) {
 		unsigned int i = 0;
-		Q_PrintBuffer( &pb, "Try 'aminfo <category>' for more detailed information\nCategories: " );
+		Q_PrintBuffer( &pb, "Try 'aminfo <category>' for more detailed information\nCategories: ^1" );
 
 		// print all categories
 		for ( i = 0; i < numAminfoSettings; i++ ) {
 			if ( i ) {
-				Q_PrintBuffer( &pb, ", " );
+				Q_PrintBuffer( &pb, "^7, ^1" );
 			}
 			Q_PrintBuffer( &pb, aminfoSettings[i].str );
 		}
+		if (ent->client->pers.adminUser && ent->client->pers.adminUser->rank > 0) {
+			Q_PrintBuffer(&pb, "\n\n^1Extra: amtag, amaccount, ");
+			if (ent->client->pers.adminUser->rank > 6) {
+				Q_PrintBuffer(&pb, "amjump");
+			}
+		}
+		Q_PrintBuffer(&pb, "\n\n^7");
+
+		PrintFile( &pb );
 
 		Q_PrintBuffer( &pb, "\n\n" );
 	}
@@ -3277,14 +3707,15 @@ static void Cmd_AMInfo_f( gentity_t *ent ) {
 	if ( !extendedInfo || extendedInfo == EXTINFO_ALL ) {
 		char version[256] = { 0 };
 		trap->Cvar_VariableStringBuffer( "version", version, sizeof(version) );
-		Q_PrintBuffer( &pb, "Version:\n    Gamecode: " JAPP_VERSION "\n" );
+		Q_PrintBuffer( &pb, "Version:\n    Gamecode: " JAPP_VERSION " - " S_COLOR_YELLOW " modified by Blackwolf " S_COLOR_WHITE "\n" );
 #ifdef _DEBUG
 		Q_PrintBuffer( &pb, "Debug build\n" );
 #endif
 		Q_PrintBuffer( &pb, va( "    Engine: %s\n\n", version ) );
 	}
 
-	if ( extendedInfo & EXTINFO_SABER ) {
+	if ( extendedInfo & EXTINFO_SABER ) 
+	{
 		// saber settings
 		Q_PrintBuffer( &pb, "Saber settings:\n" );
 
@@ -3379,10 +3810,12 @@ static void Cmd_AMInfo_f( gentity_t *ent ) {
 		Q_PrintBuffer( &pb, "\n" );
 	}
 
-	if ( !extendedInfo || (extendedInfo & EXTINFO_CMDS) ) {
+	if ( extendedInfo & EXTINFO_ADMIN) {
 		// admin commands
-		AM_PrintCommands( ent, &pb );
+		AM_PrintCommands(ent, &pb);
+	}
 
+	if ( extendedInfo & EXTINFO_CMDS ) {
 		// regular commands
 		G_PrintCommands( ent, &pb );
 	}
@@ -3747,22 +4180,22 @@ EMOTE( surrender )
 EMOTE( wait )
 EMOTE( won )
 
-static void Cmd_KnockMeDown( gentity_t *ent ) {
-	G_Knockdown( ent );
+static void Cmd_KnockMedown(gentity_t *ent){
+	G_Knockdown(ent);
 }
 
-static void Cmd_DropSaber( gentity_t *ent ) {
+
+static void Cmd_Dropsaber(gentity_t *ent){
 	if ( !japp_allowDropSaber.integer ) {
-		trap->SendServerCommand( ent - g_entities, "print \"amdropsaber is disabled\n\"" );
+		trap->SendServerCommand(ent - g_entities, "print \"amdropsaber is disabled\n\"");
 		return;
 	}
-	if ( !ent->client->ps.saberEntityNum ) {
+	if (!ent->client->ps.saberEntityNum) {
 		return;
 	}
 
 	gentity_t *saber = &g_entities[ent->client->ps.saberEntityNum];
 	if ( ent->client->ps.saberInFlight ) {
-		// turn it off in midair
 		saberKnockDown( saber, ent, ent );
 		return;
 	}
@@ -3839,6 +4272,316 @@ static void Cmd_Jetpack_f( gentity_t *ent ) {
 	}
 
 	ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << item->giTag);
+
+	if (ent->client->ps.stats[STAT_HOLDABLE_ITEMS] &= 1 << item->giTag)
+	{
+		ent->client->pers.jetpack = qtrue;
+	}
+	else 
+	{ 
+		ent->client->pers.jetpack = qfalse; 
+	}
+}
+
+static void AM_Account( gentity_t *ent ) {
+	char arg1[64] = {},
+		 arg2[64] = {},
+		 arg3[64] = {},
+		 arg4[64] = {},
+		 *argEmail = NULL;
+	printBufferSession_t pb;
+	
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+	trap->Argv(3, arg3, sizeof(arg3));
+	trap->Argv(4, arg4, sizeof(arg4));
+	argEmail = ConcatArgs(3);
+
+	if (!ent || !ent->client->pers.adminUser) {
+		return;
+	}
+
+	if (trap->Argc() < 2) {
+		trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount <view/settings/change> \n\"");
+		return;
+	}
+
+	Q_NewPrintBuffer(&pb, MAX_STRING_CHARS / 1.5, PB_Callback, ent ? (ent - g_entities) : -1);
+
+	if (ent->client->pers.adminUser->lock != 1)
+	{
+	if (!Q_stricmp(arg1, "view")) 
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount view <profile> \n\"");
+
+		if (!Q_stricmp(arg2, "profile")) 
+		{
+			Q_PrintBuffer(&pb, "^3==============^7PROFILE^3==============^7\n");
+			Q_PrintBuffer(&pb, va("^5Username^7:%-16s%s\n", "" , ent->client->pers.adminUser->user));
+			Q_PrintBuffer(&pb, va("^5Password^7:%-16s%s\n", "", ent->client->pers.adminUser->password));
+			Q_PrintBuffer(&pb, va("^5Rank^7:%-20s%s^7\n", "", ent->client->pers.adminUser->rank < ADMIN_MAX ? adminRanks[ent->client->pers.adminUser->rank].c_str() : ""));
+			Q_PrintBuffer(&pb, va("^5E-Mail^7:%-18s%s\n", "", ent->client->pers.adminUser->eMail));
+			Q_PrintBuffer(&pb, va("^5Screensize^7:%-14s%s\n", "", ent->client->pers.adminUser->isScreenS > 0 ? "^2On^7" : "^1Off^7" ));
+			Q_PrintBuffer(&pb, va("^5Customtag^7:%-15s%s\n", "", ent->client->pers.adminUser->isCustomRank > 0 ? "^2On^7" : "^1Off^7"));
+			Q_PrintBuffer(&pb, "^3===================================^7\n");
+		}
+	}
+
+	if (!Q_stricmp(arg1, "settings")) 
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount settings <screensize/customtag> \n\"");
+
+		if (!Q_stricmp(arg2, "screensize")) {
+			trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount settings screensize <on/1> or <off/0>\n\"");
+
+			if ( !Q_stricmp(arg3, "on") || !Q_stricmp(arg3, "1") ) {
+
+				if (ent->client->pers.adminUser->isScreenS == 1) {
+					trap->SendServerCommand(ent - g_entities, "print \"Screensize has been already adjusted to: ^1Small^7\n\"");
+					return;
+				}
+
+				ent->client->pers.adminUser->isScreenS = 1;
+				trap->SendServerCommand(ent - g_entities, "print \"Screensize has been adjusted to: ^1Small^7\n\"");
+
+				AM_SaveAdmins( qtrue);
+			}
+			
+			if ( !Q_stricmp(arg3, "off") || !Q_stricmp(arg3, "0") ) {
+
+				if (ent->client->pers.adminUser->isScreenS == 0) {
+					trap->SendServerCommand(ent - g_entities, "print \"Screensize has been already adjusted to: ^1Widescreen^7\n\"");
+					return;
+				}
+
+				ent->client->pers.adminUser->isScreenS = 0;
+				trap->SendServerCommand(ent - g_entities, "print \"Screensize has been adjusted to: ^1Widescreen^7\n\"");
+
+				AM_SaveAdmins( qtrue );
+			}
+		}
+
+		if (!Q_stricmp(arg2, "customtag")) {
+			trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount settings customtag <on/1> or <off/0>\n\"");
+
+			if (!Q_stricmp(arg3, "on") || !Q_stricmp(arg3, "1")) {
+
+				if (ent->client->pers.adminUser->isCustomRank == 1) {
+					trap->SendServerCommand(ent - g_entities, "print \"Customtag has been already adjusted to: ^2On^7\n\"");
+					return;
+				}
+
+				ent->client->pers.adminUser->isCustomRank = 1;
+				trap->SendServerCommand(ent - g_entities, "print \"Customtag has been adjusted to: ^2On^7\n\"");
+
+				AM_SaveAdmins(qtrue);
+			}
+
+			if (!Q_stricmp(arg3, "off") || !Q_stricmp(arg3, "0")) {
+
+				if (ent->client->pers.adminUser->isCustomRank == 0) {
+					trap->SendServerCommand(ent - g_entities, "print \"Customtag has been already adjusted to: ^1Off^7\n\"");
+					return;
+				}
+
+				ent->client->pers.adminUser->isCustomRank = 0;
+				trap->SendServerCommand(ent - g_entities, "print \"Customtag has been adjusted to: ^1Off^7\n\"");
+
+				AM_SaveAdmins(qtrue);
+			}
+		}
+	}
+
+	if (!Q_stricmp(arg1, "change")) 
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount change <password/email/tag/loginmsg> \n\"");
+
+		if (!Q_stricmp(arg2, "password")) {
+
+			if (ent->client->pers.adminUser->password == arg3) {
+				trap->SendServerCommand(ent - g_entities, "print \"You cannot change to the same password.\n\"");
+				return;
+			}
+
+			if (!Q_stricmp("", arg3)) {
+				trap->SendServerCommand(ent - g_entities, "print \"DO not use blank spaces!\n\"");
+				return;
+			}
+
+			Q_strncpyz(ent->client->pers.adminUser->password, arg3, sizeof(ent->client->pers.adminUser->password));
+			//*ent->client->pers.adminUser->password = *arg3;
+			trap->SendServerCommand(ent - g_entities, "print \"^2Success: ^7Password changed.\n\"");
+
+			AM_SaveAdmins(qtrue);
+		}
+
+		if (!Q_stricmp(arg2, "email")) {
+
+			if (ent->client->pers.adminUser->eMail == argEmail) {
+				trap->SendServerCommand(ent - g_entities, "print \"You cannot change to the same email.\n\"");
+				return;
+			}
+
+			if (!Q_stricmp("", argEmail)) {
+				trap->SendServerCommand(ent - g_entities, "print \"DO not use blank spaces!\n\"");
+				return;
+			}
+
+			Q_strncpyz(ent->client->pers.adminUser->eMail, argEmail, sizeof(ent->client->pers.adminUser->eMail));
+			//*ent->client->pers.adminUser->eMail = *argEmail;
+			trap->SendServerCommand(ent - g_entities, "print \"^2Success: ^7Email changed.\n\"");
+
+			AM_SaveAdmins(qtrue);
+		}
+
+		if (!Q_stricmp(arg2, "tag")) {
+
+			if (ent->client->pers.adminUser->customRank == arg3) {
+				trap->SendServerCommand(ent - g_entities, "print \"You cannot change to the same long tag.\n\"");
+				return;
+			}
+
+			if (!Q_stricmp("", arg3)) {
+				trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount change tag ^1<long tag> ^7<short tag>\n\"");
+				return;
+			}
+
+			if (ent->client->pers.adminUser->customRanks == arg4) {
+				trap->SendServerCommand(ent - g_entities, "print \"You cannot change to the same short tag.\n\"");
+				return;
+			}
+
+			if (!Q_stricmp("", arg4)) {
+				trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount change tag <long tag> ^1<short tag>^7\n\"");
+				return;
+			}
+
+			Q_strncpyz(ent->client->pers.adminUser->customRank, arg3, sizeof(ent->client->pers.adminUser->customRank));
+			Q_strncpyz(ent->client->pers.adminUser->customRanks, arg4, sizeof(ent->client->pers.adminUser->customRanks));
+
+			//*ent->client->pers.adminUser->password = *arg3;
+			ent->client->pers.adminUser->isCustomRank = 1;
+			trap->SendServerCommand(ent - g_entities, "print \"^2Success: ^7Tag changed.\n\"");
+
+			AM_SaveAdmins(qtrue);
+		}
+
+		if (!Q_stricmp(arg2, "loginmsg")) {
+
+			if (ent->client->pers.adminUser->loginMsg == arg3) {
+				trap->SendServerCommand(ent - g_entities, "print \"You cannot change to the same login msg.\n\"");
+				return;
+			}
+
+			if (!Q_stricmp("", arg3)) {
+				trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amaccount change loginmsg ^1<login msg>\n\"");
+				return;
+			}
+
+			Q_strncpyz(ent->client->pers.adminUser->loginMsg, arg3, sizeof(ent->client->pers.adminUser->loginMsg));
+
+			trap->SendServerCommand(ent - g_entities, "print \"^2Success: ^7Login Message changed.\n\"");
+
+			AM_SaveAdmins(qtrue);
+
+		}
+	}
+	Q_DeletePrintBuffer(&pb);
+	}
+	else
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot change or view this Account!.\n\"");
+		return;
+	}
+}
+
+
+/*
+Description: (Regex) Check if a text is alphanumeric.
+Return:      0 = Its not;  1 = It is.
+Author:      spinaLcord, Blackwolf
+*/
+int IsAlphaNumeric(const char* value)
+{
+	if (slre_match("^[a-zA-Z0-9_@]*$", value, strlen(value), NULL, 0) < 0)
+	{
+		return 0;
+	}
+	else
+		return 1;
+}
+
+static void AM_Register(gentity_t *ent) {
+	char	argUser[MAX_TOKEN_CHARS] = {},
+			argPass[MAX_TOKEN_CHARS] = {},
+			*argeMail = NULL;
+
+	if (!ent) {
+		return;
+	}
+
+	trap->Argv(1, argUser, sizeof(argUser));
+	trap->Argv(2, argPass, sizeof(argPass));
+	argeMail = ConcatArgs(3);
+	
+	if (!japp_allowRegistration.integer) {
+		trap->SendServerCommand(ent - g_entities, "print \"Sorry the Registration is locked at the moment. Please contact an Administrator\n\"");
+		return;
+	}
+
+	if (trap->Argc() <= 2) {
+		trap->SendServerCommand(ent - g_entities, "print \"Usage: \\amregister <username> <password> <email (optional)>\n\"");
+		return;
+	}
+	// Query: argument to long.
+
+	if (strlen(argUser) > 16 && strlen(argPass) > 16) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use a ^1Username ^7and a ^1Password ^7longer than ^316 ^7letters.\n\"");
+		return;
+	}
+
+	if (strlen(argUser) > 16) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use a ^1Username ^7longer than ^316 ^7letters.\n\"");
+		return;
+	}
+
+	if (strlen(argPass) > 16) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use a ^1Password ^7longer than ^316 ^7letters.\n\"");
+		return;
+	}
+
+	if (strlen(argeMail) > 42) {
+		trap->SendServerCommand(ent - g_entities, "print \"^1Email length exceeded.^7\n\"");
+		return;
+	}
+
+	// Query: allow only alphanumeric.
+	if (IsAlphaNumeric(argUser) == 0 && IsAlphaNumeric(argPass) == 0) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use ^1symboles ^7in the ^1Username ^7and ^1Password^7.\n\"");
+		return;
+	}
+
+	if (IsAlphaNumeric(argUser) == 0) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use ^1symboles ^7in the ^1Username^7.\n\"");
+		return;
+	}
+
+	if (IsAlphaNumeric(argPass) == 0) {
+		trap->SendServerCommand(ent - g_entities, "print \"You cannot use ^1symboles ^7in the ^1Password^7.\n\"");
+		return;
+	}
+	/*Not implented yet
+	        '-----------> Wolf
+	if (IsAlphaNumeric(argeMail) == 0) { 
+		trap->SendServerCommand(ent - g_entities, "print \"^1Email has illegal characters.^7\n\"");
+		return;
+	}*/
+	
+
+	trap->SendServerCommand(ent - g_entities, "print \"You've successfully registered\n\"");
+
+	AM_RegisterAccount(ent, argUser, argPass, argeMail);
+	AM_SaveAdmins( qtrue );
 }
 
 #define CMDFLAG_NOINTERMISSION	(0x0001u)
@@ -3862,6 +4605,7 @@ static int cmdcmp( const void *a, const void *b ) {
 }
 
 static const command_t commands[] = {
+	{ "amaccount", AM_Account, GTB_ALL, CMDFLAG_NOINTERMISSION },
 	{ "amaimgun", Cmd_Emote_aimgun, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amasleep", Cmd_Emote_sleep, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amatease", Cmd_Emote_atease, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
@@ -3874,9 +4618,10 @@ static const command_t commands[] = {
 	{ "amdance3", Cmd_Emote_dance3, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amdie", Cmd_Emote_die, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amdie2", Cmd_Emote_die2, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
-	{ "amdropsaber", Cmd_DropSaber, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
+	{ "amdropsaber", Cmd_Dropsaber, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amfabulous", Cmd_Emote_fabulous, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amfinishinghim", Cmd_Emote_finishinghim, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
+	//{ "amflip", Cmd_ToggleSaberJK2_f, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE }, // FIX: WHY DOES THIS CRASH WTF
 	{ "amharlem", Cmd_Emote_harlem, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amheal", Cmd_Emote_heal, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amhello", Cmd_Emote_hello, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
@@ -3888,12 +4633,13 @@ static const command_t commands[] = {
 	{ "amkiss", Cmd_Emote_kiss, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amkneel", Cmd_Emote_kneel, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amkneel2", Cmd_Emote_kneel2, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
-	{ "amknockmedown", Cmd_KnockMeDown, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
+	{ "amknockmedown", Cmd_KnockMedown, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amneo", Cmd_Emote_neo, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amnod", Cmd_Emote_nod, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amnoisy", Cmd_Emote_noisy, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "ampower", Cmd_Emote_power, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amradio", Cmd_Emote_radio, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
+	{ "amregister", AM_Register, GTB_ALL, CMDFLAG_NOINTERMISSION },
 	{ "amsay", Cmd_SayAdmin_f, GTB_ALL, 0 },
 	{ "amshake", Cmd_Emote_shake, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amshovel", Cmd_Emote_shovel, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
@@ -3912,6 +4658,9 @@ static const command_t commands[] = {
 	{ "amwait", Cmd_Emote_wait, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "amwon", Cmd_Emote_won, GTB_ALL, CMDFLAG_NOINTERMISSION | CMDFLAG_ALIVE },
 	{ "callvote", Cmd_CallVote_f, GTB_ALL, CMDFLAG_NOINTERMISSION },
+	{ "clanpass", Cmd_SetClanpass_f, GTB_ALL, 0 },
+	{ "clansay", Cmd_SayClan_f, GTB_ALL, 0 },
+	{ "clanwhois", Cmd_ClanWhoIs_f, GTB_ALL, 0 },
 	{ "debugBMove_Back", Cmd_BotMoveBack_f, GTB_ALL, CMDFLAG_CHEAT | CMDFLAG_ALIVE },
 	{ "debugBMove_Forward", Cmd_BotMoveForward_f, GTB_ALL, CMDFLAG_CHEAT | CMDFLAG_ALIVE },
 	{ "debugBMove_Left", Cmd_BotMoveLeft_f, GTB_ALL, CMDFLAG_CHEAT | CMDFLAG_ALIVE },
@@ -4039,34 +4788,78 @@ void ClientCommand( int clientNum ) {
 	}
 }
 
-void G_PrintCommands( gentity_t *ent, printBufferSession_t *pb ) {
+void G_PrintCommands(gentity_t *ent, printBufferSession_t *pb) {
 	const command_t *command = NULL;
 	int toggle = 0;
 	unsigned int count = 0;
-	const unsigned int limit = 72;
+	const unsigned int limit = 102;
 	size_t i;
 
-	Q_PrintBuffer( pb, "Regular commands:\n   " );
+	Q_PrintBuffer(pb, "Regular commands:\n   ");
 
-	for ( i = 0, command = commands; i < numCommands; i++, command++ ) {
-		const char *tmpMsg = NULL;
+	for (i = 0, command = commands; i < numCommands; i++, command++) {
+		if (ent->client->pers.adminUser) {
+			if (ent->client->pers.adminUser->isScreenS < 1) {
+				const char *tmpMsg = NULL;
 
-		// if it's not allowed to be executed at the moment, continue
-		if ( G_CmdValid( ent, command ) ) {
-			continue;
+				// if it's not allowed to be executed at the moment, continue
+				if (G_CmdValid(ent, command)) {
+					continue;
+				}
+
+				tmpMsg = va("^%c%-16s", (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->name);
+
+				//newline if we reach limit
+				if (count >= limit) {
+					tmpMsg = va("\n   %-18s", tmpMsg);
+					count = 0;
+				}
+
+				count += strlen(tmpMsg);
+				Q_PrintBuffer(pb, tmpMsg);
+			}
+			else
+			{
+				const char *tmpMsg = NULL;
+				const unsigned int limit = 72;
+
+				// if it's not allowed to be executed at the moment, continue
+				if (G_CmdValid(ent, command)) {
+					continue;
+				}
+
+				tmpMsg = va("^%c%-16s", (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->name);
+
+				//newline if we reach limit
+				if (count >= limit) {
+					tmpMsg = va("\n   %-18s", tmpMsg);
+					count = 0;
+				}
+
+				count += strlen(tmpMsg);
+				Q_PrintBuffer(pb, tmpMsg);
+			}
 		}
+		else
+		{
+			const char *tmpMsg = NULL;
 
-		tmpMsg = va( " ^%c%s", (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->name );
+			// if it's not allowed to be executed at the moment, continue
+			if (G_CmdValid(ent, command)) {
+				continue;
+			}
 
-		//newline if we reach limit
-		if ( count >= limit ) {
-			tmpMsg = va( "\n   %s", tmpMsg );
-			count = 0;
+			tmpMsg = va("^%c%-16s", (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->name);
+
+			//newline if we reach limit
+			if (count >= limit) {
+				tmpMsg = va("\n   %-18s", tmpMsg);
+				count = 0;
+			}
+
+			count += strlen(tmpMsg);
+			Q_PrintBuffer(pb, tmpMsg);
 		}
-
-		count += strlen( tmpMsg );
-		Q_PrintBuffer( pb, tmpMsg );
 	}
-
-	Q_PrintBuffer( pb, S_COLOR_WHITE "\n\n" );
+	Q_PrintBuffer(pb, S_COLOR_WHITE "\n\n");
 }

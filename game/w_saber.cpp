@@ -3612,12 +3612,13 @@ static qboolean CheckSaberDamage( gentity_t *self, int rSaberNum, int rBladeNum,
 			//	assert( !"Unhandled damage case!" );
 			}
 
+			
 			if ( (japp_saberTweaks.integer & SABERTWEAK_NERFDMG) ) {
 				if ( self->client->ps.saberMove == LS_ROLL_STAB ) {
 					dmg = G_GetAttackDamage( self, 1, 25, 0.333f );
 				}
 			}
-
+			
 
 			attackStr = self->client->ps.fd.saberAnimLevel;
 		}
@@ -7566,6 +7567,8 @@ nextStep:
 				self->client->dangerTime = level.time;
 				self->client->ps.eFlags &= ~EF_INVULNERABLE;
 				self->client->invulnerableTimer = 0;
+				if (self->client->invulnerableSpecial)
+					self->client->invulnerableSpecial = qfalse;
 
 				trap->LinkEntity( (sharedEntity_t *)saberent );
 			}
@@ -8101,7 +8104,8 @@ int WP_SaberCanBlock( gentity_t *self, vector3 *point, uint32_t dflags, int mod,
 		(projectile || attackStr == FORCE_LEVEL_3)*/ ) { //don't block when the player is trying to slash, if it's a projectile or he's doing a very strong attack
 		return 0;
 	}
-
+	
+	
 	if ( japp_saberTweaks.integer & SABERTWEAK_REDUCEBLOCKS ) {
 		const int ourLevel = G_SaberLevelForStance( self->client->ps.fd.saberAnimLevel );
 		const int theirLevel = G_SaberLevelForStance( attackStr );
@@ -8115,6 +8119,7 @@ int WP_SaberCanBlock( gentity_t *self, vector3 *point, uint32_t dflags, int mod,
 			return 0;
 		}
 	}
+	
 
 	if ( SaberAttacking( self ) ) { //attacking, can't block now
 		return 0;

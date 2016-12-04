@@ -6,6 +6,7 @@
 #include "bg_local.h"
 #include "JAPP/jp_csflags.h"
 #include "bg_lua.h"
+#include <time.h>
 
 qboolean PM_SaberInTransition( int move );
 qboolean PM_SaberInReturn( int move );
@@ -743,6 +744,8 @@ void G_CheapWeaponFire( int entNum, int ev ) {
 		ent->client->dangerTime = level.time;
 		ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 		ent->client->invulnerableTimer = 0;
+		if (ent->client->invulnerableSpecial)
+			ent->client->invulnerableSpecial = qfalse;
 		break;
 
 	case EV_ALT_FIRE:
@@ -750,6 +753,8 @@ void G_CheapWeaponFire( int entNum, int ev ) {
 		ent->client->dangerTime = level.time;
 		ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 		ent->client->invulnerableTimer = 0;
+		if (ent->client->invulnerableSpecial)
+			ent->client->invulnerableSpecial = qfalse;
 		break;
 
 	default:
@@ -837,6 +842,8 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			ent->client->dangerTime = level.time;
 			ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 			ent->client->invulnerableTimer = 0;
+			if (ent->client->invulnerableSpecial)
+				ent->client->invulnerableSpecial = qfalse;
 			break;
 
 		case EV_ALT_FIRE:
@@ -844,12 +851,16 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 			ent->client->dangerTime = level.time;
 			ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 			ent->client->invulnerableTimer = 0;
+			if (ent->client->invulnerableSpecial)
+				ent->client->invulnerableSpecial = qfalse;
 			break;
 
 		case EV_SABER_ATTACK:
 			ent->client->dangerTime = level.time;
 			ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 			ent->client->invulnerableTimer = 0;
+			if (ent->client->invulnerableSpecial)
+				ent->client->invulnerableSpecial = qfalse;
 			break;
 
 			//rww - Note that these must be in the same order (ITEM#-wise) as they are in holdable_t
@@ -963,7 +974,7 @@ void G_UpdateClientBroadcasts( gentity_t *self ) {
 		}
 
 		if ( self->client->pers.adminData.isGhost ) {
-			if ( other->client->pers.adminUser /*&& AM_HasPrivilege( other, PRIV_GHOST )*/ ) {
+			if ( other->client->pers.adminUser && other->client->pers.adminUser->rank > 0 /*&& AM_HasPrivilege( other, PRIV_GHOST )*/ ) {
 				send = qtrue;
 			}
 			else {
@@ -1623,6 +1634,24 @@ void ClientThink_real( gentity_t *ent ) {
 		return;
 	}
 
+	if ( client->pers.adminData.icon == qtrue ) {
+		client->ps.eFlags |= EF_CONNECTION;
+	}
+
+	else { client->ps.eFlags &= ~EF_CONNECTION; }
+
+	if ( ent->client->pers.adminData.isGod ) {
+		God_On( ent );
+	}
+
+	if ( ent->client->pers.adminData.merc ) {
+		Merc_On( ent );
+	}
+
+	if ( ent->client->pers.adminData.isMonked ) {
+		Monk_On( ent );
+	}
+
 	// This code was moved here from clientThink to fix a problem with g_synchronousClients
 	// being set to 1 when in vehicles.
 	if ( ent->s.number < MAX_CLIENTS && ent->client->ps.m_iVehicleNum ) {//driving a vehicle
@@ -1775,6 +1804,7 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 
 	if ( ent && ent->client && (ent->client->ps.eFlags & EF_INVULNERABLE) ) {
+				
 		if ( ent->client->invulnerableTimer <= level.time ) {
 			ent->client->ps.eFlags &= ~EF_INVULNERABLE;
 		}
@@ -2054,7 +2084,14 @@ void ClientThink_real( gentity_t *ent ) {
 					VectorClear( &client->ps.velocity );
 					client->ps.gravity = 1.0f;
 				}
-				else {
+
+				else if ( client->pers.adminData.qgravity )
+				{
+					client->ps.gravity = client->pers.adminData.gravity;
+				}
+
+				else 
+				{
 					client->ps.gravity = g_gravity.value;
 				}
 			}
@@ -2713,7 +2750,7 @@ void ClientThink_real( gentity_t *ent ) {
 			ForceSpeed( ent, 0 );
 			break;
 		case GENCMD_FORCE_THROW:
-			if (ent->client->ps.forceDodgeAnim == BOTH_KISSEE){
+			if (ent->client->ps.forceDodgeAnim == BOTH_KISSEE) {
 
 				ent->client->ps.forceHandExtend = HANDEXTEND_TAUNT;
 				ent->client->ps.forceHandExtendTime = level.time + BG_AnimLength(ent->localAnimIndex, BOTH_FORCEGRIP3THROW);
@@ -2905,25 +2942,27 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( ent->s.eType != ET_NPC && ent->client && ent->client->pers.connected == CON_CONNECTED
 		&& !!(japp_allowHook.bits & (1 << level.gametype)) )
 	{
-		const bool saberBusy = PM_SaberInStart( ent->client->ps.saberMove )
+		/*const bool saberBusy = PM_SaberInStart( ent->client->ps.saberMove )
 					|| BG_SaberInAttack( ent->client->ps.saberMove )
 					|| PM_SaberInReturn( ent->client->ps.saberMove )
-					|| PM_SaberInTransition( ent->client->ps.saberMove );
+					|| PM_SaberInTransition( ent->client->ps.saberMove );*/
 		const bool oldGrapple = GetCPD( (bgEntity_t *)ent, CPD_OLDGRAPPLE )
 			|| !Client_Supports( ent, CSF_GRAPPLE_SWING );
 		const bool pullGrapple = !!(ent->client->pers.cmd.buttons & BUTTON_GRAPPLE);
 		const bool releaseGrapple = !!(ent->client->pers.cmd.buttons & BUTTON_USE);
 
-		if ( ent->client->hook && pullGrapple
+		/*if ( ent->client->hook && pullGrapple
 			&& (saberBusy
 				|| ent->client->ps.duelInProgress
 				|| ent->client->ps.forceHandExtend != HANDEXTEND_NONE) )
 		{
 			Weapon_HookFree( ent->client->hook );
 		}
-		else if ( !ent->client->hook && pullGrapple && ent->client->ps.pm_type != PM_DEAD
+		*/
+
+		if ( !ent->client->hook && pullGrapple && ent->client->ps.pm_type != PM_DEAD
 			&& ent->client->lastHookTime <= level.time - japp_hookDebouncer.integer
-			&& !saberBusy )
+			/*&& !saberBusy*/ )
 		{
 			Weapon_GrapplingHook_Fire( ent );
 		}
@@ -3034,63 +3073,67 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( japp_flipKick.integer && client->ps.forceKickFlip ) {
 		gentity_t *faceKicked = &g_entities[client->ps.forceKickFlip - 1];
 
-		if ( faceKicked && faceKicked->client
-			&& (!OnSameTeam( ent, faceKicked ) || g_friendlyFire.integer)
-			&& (!faceKicked->client->ps.duelInProgress || faceKicked->client->ps.duelIndex == ent->s.number)
-			&& (!ent->client->ps.duelInProgress || ent->client->ps.duelIndex == faceKicked->s.number) )
-		{
-			if ( faceKicked->health > 0
-				&& faceKicked->takedamage
-				&& !(faceKicked->client->ps.eFlags & EF_INVULNERABLE) )
+		if (faceKicked && faceKicked->client
+			&& (!OnSameTeam(ent, faceKicked) || g_friendlyFire.integer)
+			&& (!faceKicked->client->ps.duelInProgress || !faceKicked->client->ps.duelIndex == ent->s.number)
+			&& (!ent->client->ps.duelInProgress || !ent->client->ps.duelIndex == faceKicked->s.number))
 			{
+			if (faceKicked->health > 0
+				&& faceKicked->takedamage
+				&& !(faceKicked->client->ps.eFlags & EF_INVULNERABLE))
+				{
 				// push them away and do pain
 				vector3 oppDir;
 				const float strength = VectorNormalize2( &client->ps.velocity, &oppDir );
 
 				VectorScale( &oppDir, -1, &oppDir );
 
-				if ( japp_flipKickDamage.integer ) {
-					G_Damage(
-						faceKicked, ent, ent, &oppDir, &client->ps.origin, japp_flipKickDamage.integer, DAMAGE_NO_ARMOR,
-						MOD_MELEE
-					);
+				if (japp_flipKickDamage.integer) {
+					G_Damage( faceKicked, ent, ent, &oppDir, &client->ps.origin, japp_flipKickDamage.integer, DAMAGE_NO_ARMOR, MOD_MELEE );
 				}
 
-				if ( faceKicked->client->ps.weapon != WP_SABER
+				if (faceKicked->client->ps.weapon != WP_SABER
 					|| faceKicked->client->ps.fd.saberAnimLevel != FORCE_LEVEL_3
-					|| (!BG_SaberInAttack( faceKicked->client->ps.saberMove )
-						&& !PM_SaberInStart( faceKicked->client->ps.saberMove )
-						&& !PM_SaberInReturn( faceKicked->client->ps.saberMove )
-						&& !PM_SaberInTransition( faceKicked->client->ps.saberMove )) )
-				{
+					|| (!BG_SaberInAttack(faceKicked->client->ps.saberMove)
+						&& !PM_SaberInStart(faceKicked->client->ps.saberMove)
+						&& !PM_SaberInReturn(faceKicked->client->ps.saberMove)
+						&& !PM_SaberInTransition(faceKicked->client->ps.saberMove)))
+					{
 					if ( faceKicked->health > 0 &&
 						faceKicked->client->ps.stats[STAT_HEALTH] > 0 &&
-						faceKicked->client->ps.forceHandExtend != HANDEXTEND_KNOCKDOWN )
-					{
-						// only actually knock over sometimes, but always do velocity hit
-						if ( japp_flipKickKnockdown.integer
-							&& BG_KnockDownable( &faceKicked->client->ps )
-							&& Q_irand( 1, 10 ) <= 3 )
+						faceKicked->client->ps.forceHandExtend != HANDEXTEND_KNOCKDOWN)
 						{
+							// only actually knock over sometimes, but always do velocity hit
+							if (japp_flipKickKnockdown.integer
+								&& BG_KnockDownable(&faceKicked->client->ps)
+								&& Q_irand(1, 10) <= 3)
+							{
 							faceKicked->client->ps.forceHandExtend = HANDEXTEND_KNOCKDOWN;
 							faceKicked->client->ps.forceHandExtendTime = level.time + 1100;
-							// this toggles between 1 and 0, when it's 1 we should play the get up anim
+							//this toggles between 1 and 0, when it's 1 we should play the get up anim
 							faceKicked->client->ps.forceDodgeAnim = 0;
 						}
 
 						faceKicked->client->ps.otherKiller = ent->s.number;
 						faceKicked->client->ps.otherKillerTime = level.time + 5000;
 						faceKicked->client->ps.otherKillerDebounceTime = level.time + 100;
+					
+						if (faceKicked->client->invulnerableSpecial) {
+							faceKicked->client->invulnerableTimer = level.time + 5000;
+							faceKicked->client->ps.eFlags |= EF_INVULNERABLE;
+						}
 
-						faceKicked->client->ps.velocity.x = oppDir.x*(strength * 2);
-						faceKicked->client->ps.velocity.y = oppDir.y*(strength * 2);
-						faceKicked->client->ps.velocity.z = 200;
+						if (!faceKicked->client->invulnerableSpecial) {
+							faceKicked->client->ps.velocity.x = oppDir.x*(strength * 2);
+							faceKicked->client->ps.velocity.y = oppDir.y*(strength * 2);
+							faceKicked->client->ps.velocity.z = 200;
+						}
+
 					}
 				}
 
-				const char *soundPath = va( "sound/weapons/melee/punch%d", Q_irand( 1, 4 ) );
-				G_Sound( faceKicked, CHAN_AUTO, G_SoundIndex( soundPath ) );
-
+				const char *soundPath = va("sound/weapons/melee/punch%d", Q_irand(1, 4));
+				G_Sound(faceKicked, CHAN_AUTO, G_SoundIndex(soundPath));
 			}
 		}
 
@@ -3174,7 +3217,6 @@ void ClientThink_real( gentity_t *ent ) {
 			ent->client->ps.m_iVehicleNum = 0;
 		}
 	}
-
 }
 
 // Checks whether a client has exceded any timeouts and act accordingly
@@ -3269,9 +3311,7 @@ void ClientThink( int clientNum, usercmd_t *ucmd ) {
 
 void G_RunClient( gentity_t *ent ) {
 	// force client updates if they're not sending packets at roughly 4hz
-	if ( !(ent->r.svFlags & SVF_BOT) && g_forceClientUpdateRate.integer
-		&& ent->client->lastCmdTime < level.time - g_forceClientUpdateRate.integer )
-	{
+	if ( !(ent->r.svFlags & SVF_BOT) && g_forceClientUpdateRate.integer && ent->client->lastCmdTime < level.time - g_forceClientUpdateRate.integer ) {
 		trap->GetUsercmd( ent - g_entities, &ent->client->pers.cmd );
 
 		ent->client->lastCmdTime = level.time;
@@ -3369,7 +3409,7 @@ static void G_SendScoreboardUpdate( gentity_t *ent ) {
 		ping = (cl->pers.connected == CON_CONNECTING) ? -1 : Q_clampi( 0, cl->ps.ping, 999 );
 		accuracy = (cl->accuracy_shots) ? cl->accuracy_hits * 100 / cl->accuracy_shots : 0;
 		perfect = (cl->ps.persistant[PERS_RANK] == 0 && cl->ps.persistant[PERS_KILLED] == 0);
-
+	
 		// base, no K/D
 		if ( !Client_Supports( ent, CSF_SCOREBOARD_KD ) ) {
 			Com_sprintf( entry,
@@ -3517,7 +3557,7 @@ void ClientEndFrame( gentity_t *ent ) {
 	ent->client->ps.stats[STAT_HEALTH] = ent->health;	// FIXME: get rid of ent->health...
 
 	G_SetClientSound( ent );
-
+	
 	// set the latest infor
 	if ( g_smoothClients.integer ) {
 		BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qfalse );
@@ -3537,5 +3577,3 @@ void ClientEndFrame( gentity_t *ent ) {
 	//	i = trap->AAS_PointReachabilityAreaIndex( ent->client->ps.origin );
 	//	ent->client->areabits[i >> 3] |= 1 << (i & 7);
 }
-
-

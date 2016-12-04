@@ -27,19 +27,49 @@ static qboolean telemarksVisible = qfalse;
 static int effectid = 0;
 int lastluaid = -1;
 
+enum adminRanks_e {
+	ADMIN_USER = 0,
+	ADMIN_TRIAL,
+	ADMIN_OPERATOR,
+	ADMIN_MODERATOR,
+	ADMIN_GAMEMASTER,
+	ADMIN_ADMINISTRATOR,
+	ADMIN_SPECIAL,
+	ADMIN_DEVELOPER,
+	ADMIN_HOSTER,
+	ADMIN_OWNER,
+
+	ADMIN_MAX
+};
+
+static std::array<std::string, ADMIN_MAX> adminRanks = { {
+		"" S_COLOR_WHITE	"User" S_COLOR_WHITE "",
+		"" S_COLOR_CYAN		"Trial" S_COLOR_WHITE "",
+		"" S_COLOR_BLUE		"Operator" S_COLOR_WHITE "",
+		"" S_COLOR_GREEN	"Moderator" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"GameMaster" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Administrator" S_COLOR_WHITE "",
+		"" S_COLOR_YELLOW	"Very Important Person" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Developer" S_COLOR_WHITE "",
+		"" S_COLOR_RED		"Hoster" S_COLOR_WHITE "",
+		"" S_COLOR_MAGENTA	"Founder" S_COLOR_WHITE ""
+} };
+
 enum adminStrings_e {
-	ADMIN_STRING_BAN = 0,
 	ADMIN_STRING_EMPOWER,
 	ADMIN_STRING_EMPOWER_ANNOUNCE,
 	ADMIN_STRING_UNEMPOWER,
+	ADMIN_STRING_UNEMPOWER_ANNOUNCE,
 	ADMIN_STRING_FREEZE,
 	ADMIN_STRING_UNFREEZED,
 	ADMIN_STRING_GHOST,
 	ADMIN_STRING_GHOST_ANNOUNCE,
 	ADMIN_STRING_UNGHOSTED,
-	ADMIN_STRING_GIVE,
-	ADMIN_STRING_GIVE_ANNOUNCE,
-	ADMIN_STRING_KICK,
+	ADMIN_STRING_UNGHOSTED_ANNOUNCE,
+	ADMIN_STRING_GOD,
+	ADMIN_STRING_GOD_ANNOUNCE,
+	ADMIN_STRING_UNGOD,
+	ADMIN_STRING_UNGOD_ANNOUNCE,
 	ADMIN_STRING_MAP,
 	ADMIN_STRING_MERC,
 	ADMIN_STRING_MERC_ANNOUNCE,
@@ -48,12 +78,15 @@ enum adminStrings_e {
 	ADMIN_STRING_PROTECT,
 	ADMIN_STRING_PROTECT_ANNOUNCE,
 	ADMIN_STRING_UNPROTECTED,
+	ADMIN_STRING_UNPROTECTED_ANNOUNCE,
 	ADMIN_STRING_SILENCE,
 	ADMIN_STRING_SILENCE_ANNOUNCE,
 	ADMIN_STRING_SILENCE_ALL,
 	ADMIN_STRING_UNSILENCED,
+	ADMIN_STRING_UNSILENCED_ANNOUNCE,
 	ADMIN_STRING_UNSILENCED_ALL,
 	ADMIN_STRING_SLAP,
+	ADMIN_STRING_SLAP_ANNOUNCE,
 	ADMIN_STRING_SLAY,
 	ADMIN_STRING_SLAY_ANNOUNCE,
 	ADMIN_STRING_SLAY_ALL,
@@ -66,27 +99,33 @@ enum adminStrings_e {
 	ADMIN_STRING_WAKE_ANNOUNCE,
 	ADMIN_STRING_WAKE_ALL,
 	ADMIN_STRING_WEATHER,
-	ADMIN_STRING_RENAME,
+	ADMIN_STRING_WEATHER_ANNOUNCE,
 	ADMIN_STRING_NOTARGETON,
 	ADMIN_STRING_NOTARGETOFF,
 	ADMIN_STRING_NOTARGETON_ANNOUNCE,
 	ADMIN_STRING_NOTARGETOFF_ANNOUNCE,
+	ADMIN_STRING_MONKON,
+	ADMIN_STRING_MONKOFF,
+	ADMIN_STRING_MONKON_ANNOUNCE,
+	ADMIN_STRING_MONKOFF_ANNOUNCE,
 
 	ADMIN_STRING_MAX
 };
 static std::array<std::string, ADMIN_STRING_MAX> adminStrings = { {
-	"was banned (reason: $1)", // ADMIN_STRING_BAN
 	"The Gods gave you power", // ADMIN_STRING_EMPOWER
 	"$1 has been empowered", // ADMIN_STRING_EMPOWER_ANNOUNCE
 	"You have lost your powers", // ADMIN_STRING_UNEMPOWER
+	"$1 has been unempowered", // ADMIN_STRING_UNEMPOWER_ANNOUNCE
 	"Don't move!", // ADMIN_STRING_FREEZE
 	"You may go now", // ADMIN_STRING_UNFREEZED
 	"No one sees you", // ADMIN_STRING_GHOST
 	"$1 is a ghost", // ADMIN_STRING_GHOST_ANNOUNCE
 	"You are visible again", // ADMIN_STRING_UNGHOSTED
-	"You received $1", // ADMIN_STRING_GIVE
-	"$1 received $2", // ADMIN_STRING_GIVE_ANNOUNCE
-	"was kicked (reason: $1)", // ADMIN_STRING_KICK
+	"$1 is not a ghost", // ADMIN_STRING_UNGHOSTED_ANNOUNCE
+	"You received Godmode", // ADMIN_STRING_GOD
+	"$1 received Godmode", // ADMIN_STRING_GOD_ANNOUNCE
+	"You lost Godmode", // ADMIN_STRING_UNGOD
+	"$1 lost Godmode", // ADMIN_STRING_UNGOD_ANNOUNCE
 	"", // ADMIN_STRING_MAP
 	"Look at all the guns you've got", // ADMIN_STRING_MERC
 	"$1 has got a lot of guns, run away", // ADMIN_STRING_MERC_ANNOUNCE
@@ -95,12 +134,15 @@ static std::array<std::string, ADMIN_STRING_MAX> adminStrings = { {
 	"You are protected", // ADMIN_STRING_PROTECT
 	"$1 is untouchable", // ADMIN_STRING_PROTECT_ANNOUNCE
 	"You've lost your protection", // ADMIN_STRING_UNPROTECTED
+	"$1 is touchable", // ADMIN_STRING_UNPROTECTED_ANNOUNCE
 	"Stop talking!", // ADMIN_STRING_SILENCE
 	"$1 has been silenced", // ADMIN_STRING_SILENCE_ANNOUNCE
 	"You all have been silenced", // ADMIN_STRING_SILENCE_ALL
 	"You may talk now", // ADMIN_STRING_UNSILENCED
+	"$1 has been unsilenced", // ADMIN_STRING_UNSILENCED_ANNOUNCE
 	"You all have been unsilenced", // ADMIN_STRING_UNSILENCED_ALL
 	"You have been slapped", // ADMIN_STRING_SLAP
+	"$1 has been slapped", // ADMIN_STRING_SLAP_ANNOUNCE
 	"You have been slain", // ADMIN_STRING_SLAY
 	"$1 has been slain", // ADMIN_STRING_SLAY_ANNOUNCE
 	"You all have been slain", // ADMIN_STRING_SLAY_ALL
@@ -112,27 +154,33 @@ static std::array<std::string, ADMIN_STRING_MAX> adminStrings = { {
 	"Wakey-wakey, sunshine!", // ADMIN_STRING_WAKE
 	"$1 woke up", // ADMIN_STRING_WAKE_ANNOUNCE
 	"Rise and shine, everyone", // ADMIN_STRING_WAKE_ALL
-	"$1 set weather to $2", // ADMIN_STRING_WEATHER
-	"$1 renamed $2 to $3", // ADMIN_STRING_RENAME
+	"Weather changed", //ADMIN_STRING_WEATHER
+	"$1 changed the weather", // ADMIN_STRING_WEATHER_ANNOUNCE
 	"You are no longer seen by NPCs", // ADMIN_STRING_NOTARGETON
 	"NPCs can see you again", // ADMIN_STRING_NOTARGETOFF
 	"$1 is no longer seen by NPCs", // ADMIN_STRING_NOTARGETON_ANNOUNCE
 	"$1 can seen by NPCs again", // ADMIN_STRING_NOTARGETOFF_ANNOUNCE
+	"Get Monk'd!", // ADMIN_STRING_MONKON
+	"Back to work.", // ADMIN_STRING_MONKOFF
+	"$1 got Monk'd!", // ADMIN_STRING_MONKON_ANNOUNCE
+	"$1 is not anymore a Monk!", // ADMIN_STRING_MONKOFF_ANNOUNCE
 } };
 
 static const stringID_table_t adminStringsByIndex[ADMIN_STRING_MAX] = {
-	ENUM2STRING( ADMIN_STRING_BAN ),
 	ENUM2STRING( ADMIN_STRING_EMPOWER ),
 	ENUM2STRING( ADMIN_STRING_EMPOWER_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_UNEMPOWER ),
+	ENUM2STRING( ADMIN_STRING_UNEMPOWER_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_FREEZE ),
 	ENUM2STRING( ADMIN_STRING_UNFREEZED ),
 	ENUM2STRING( ADMIN_STRING_GHOST ),
-	ENUM2STRING( ADMIN_STRING_GHOST_ANNOUNCE ),
+	ENUM2STRING( ADMIN_STRING_GHOST_ANNOUNCE) ,
 	ENUM2STRING( ADMIN_STRING_UNGHOSTED ),
-	ENUM2STRING( ADMIN_STRING_GIVE ),
-	ENUM2STRING( ADMIN_STRING_GIVE_ANNOUNCE ),
-	ENUM2STRING( ADMIN_STRING_KICK ),
+	ENUM2STRING( ADMIN_STRING_UNGHOSTED_ANNOUNCE ),
+	ENUM2STRING( ADMIN_STRING_GOD ),
+	ENUM2STRING( ADMIN_STRING_GOD_ANNOUNCE ),
+	ENUM2STRING( ADMIN_STRING_UNGOD ),
+	ENUM2STRING( ADMIN_STRING_UNGOD_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_MAP ),
 	ENUM2STRING( ADMIN_STRING_MERC ),
 	ENUM2STRING( ADMIN_STRING_MERC_ANNOUNCE ),
@@ -141,12 +189,15 @@ static const stringID_table_t adminStringsByIndex[ADMIN_STRING_MAX] = {
 	ENUM2STRING( ADMIN_STRING_PROTECT ),
 	ENUM2STRING( ADMIN_STRING_PROTECT_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_UNPROTECTED ),
+	ENUM2STRING( ADMIN_STRING_UNPROTECTED_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_SILENCE ),
 	ENUM2STRING( ADMIN_STRING_SILENCE_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_SILENCE_ALL ),
 	ENUM2STRING( ADMIN_STRING_UNSILENCED ),
+	ENUM2STRING( ADMIN_STRING_UNSILENCED_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_UNSILENCED_ALL ),
 	ENUM2STRING( ADMIN_STRING_SLAP ),
+	ENUM2STRING( ADMIN_STRING_SLAP_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_SLAY ),
 	ENUM2STRING( ADMIN_STRING_SLAY_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_SLAY_ALL ),
@@ -159,11 +210,15 @@ static const stringID_table_t adminStringsByIndex[ADMIN_STRING_MAX] = {
 	ENUM2STRING( ADMIN_STRING_WAKE_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_WAKE_ALL ),
 	ENUM2STRING( ADMIN_STRING_WEATHER ),
-	ENUM2STRING( ADMIN_STRING_RENAME ),
+	ENUM2STRING( ADMIN_STRING_WEATHER_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_NOTARGETON ),
 	ENUM2STRING( ADMIN_STRING_NOTARGETOFF ),
 	ENUM2STRING( ADMIN_STRING_NOTARGETON_ANNOUNCE ),
 	ENUM2STRING( ADMIN_STRING_NOTARGETOFF_ANNOUNCE ),
+	ENUM2STRING( ADMIN_STRING_MONKON ),
+	ENUM2STRING( ADMIN_STRING_MONKOFF ),
+	ENUM2STRING( ADMIN_STRING_MONKON_ANNOUNCE ),
+	ENUM2STRING( ADMIN_STRING_MONKOFF_ANNOUNCE ),
 };
 
 static void AM_ConsolePrint( const gentity_t *ent, const char *msg ) {
@@ -212,45 +267,36 @@ static void AM_FillStrings( fileHandle_t handle ) {
 }
 
 //NOTE: arg2 is expected to be at-least 128 bytes long
-static void AM_DrawString( int type, gentity_t *ent = NULL, const char *arg = NULL, char *arg2 = NULL );
-static void AM_DrawString( int type, gentity_t *ent, const char *arg, char *arg2 ) {
+static void AM_DrawString( int type, gentity_t *ent = NULL, gentity_t *executer = NULL, const char *arg = NULL, char *arg2 = NULL );
+static void AM_DrawString( int type, gentity_t *ent, gentity_t *executer, const char *arg, char *arg2 ) {
 	if (!ent) return;
 	std::string string = adminStrings[type];
-	int announce = 0;
+	int announce;
 
 	switch ( type ) {
-	case ADMIN_STRING_KICK:
-	case ADMIN_STRING_BAN: {
-		if ( arg ) {
-			std::string::size_type pos = 0;
-			if ( strlen( arg ) != 0 ) {
-				if ((pos = string.find("$1")) != std::string::npos){
-					string.replace(pos, 2, arg); // reason
-				}
-			}
-			else {
-				if ((pos = string.find("$1")) != std::string::npos){
-					string.replace(pos, 2, "null");
-				}
-			}
-			Q_strncpyz( arg2, string.c_str(), 128 ); //FIXME: make sure 128 is the right size
-		}
-	} break;
 
 	case ADMIN_STRING_EMPOWER: {
 		announce = ADMIN_STRING_EMPOWER_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_UNEMPOWER: {
+		announce = ADMIN_STRING_UNEMPOWER_ANNOUNCE;
 	} break;
 
 	case ADMIN_STRING_GHOST: {
 		announce = ADMIN_STRING_GHOST_ANNOUNCE;
 	} break;
 
-	case ADMIN_STRING_GIVE: {
-		announce = ADMIN_STRING_GIVE_ANNOUNCE;
-		std::string::size_type pos = 0;
-		if ((pos = string.find("$1")) != std::string::npos){
-			string.replace(pos, 2, arg); // what received)
-		}
+	case ADMIN_STRING_UNGHOSTED: {
+		announce = ADMIN_STRING_UNGHOSTED_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_GOD: {
+		announce = ADMIN_STRING_GOD_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_UNGOD: {
+		announce = ADMIN_STRING_UNGOD_ANNOUNCE;
 	} break;
 
 	case ADMIN_STRING_MERC: {
@@ -265,8 +311,20 @@ static void AM_DrawString( int type, gentity_t *ent, const char *arg, char *arg2
 		announce = ADMIN_STRING_PROTECT_ANNOUNCE;
 	} break;
 
+	case ADMIN_STRING_UNPROTECTED: {
+		announce = ADMIN_STRING_UNPROTECTED_ANNOUNCE;
+	} break;
+
 	case ADMIN_STRING_SILENCE: {
 		announce = ADMIN_STRING_SILENCE_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_UNSILENCED: {
+		announce = ADMIN_STRING_UNSILENCED_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_SLAP: {
+		announce = ADMIN_STRING_SLAP_ANNOUNCE;
 	} break;
 
 	case ADMIN_STRING_SLAY: {
@@ -286,21 +344,23 @@ static void AM_DrawString( int type, gentity_t *ent, const char *arg, char *arg2
 	} break;
 
 	case ADMIN_STRING_WEATHER: {
-		std::string::size_type pos = 0;
-		if ((pos = string.find("$1")) != std::string::npos){
-			string.replace(pos, 2, ent->client->pers.netname);
-			if ((pos = string.find("$2")) != std::string::npos){
-				string.replace(pos, 2, arg);
-			}
-		}
+		announce = ADMIN_STRING_WEATHER_ANNOUNCE;
 	} break;
-
+	
 	case ADMIN_STRING_NOTARGETON: {
 		announce = ADMIN_STRING_NOTARGETON_ANNOUNCE;
 	} break;
-
+	
 	case ADMIN_STRING_NOTARGETOFF: {
 		announce = ADMIN_STRING_NOTARGETOFF_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_MONKON: {
+		announce = ADMIN_STRING_MONKON_ANNOUNCE;
+	} break;
+
+	case ADMIN_STRING_MONKOFF: {
+		announce = ADMIN_STRING_MONKOFF_ANNOUNCE;
 	} break;
 
 	}
@@ -318,28 +378,15 @@ static void AM_DrawString( int type, gentity_t *ent, const char *arg, char *arg2
 		}
 	}
 
-	if ( announce ) {
-		std::string::size_type pos = 0;
-		std::string anon = adminStrings[announce];
-		if ( !anon.empty() ){
-			if ((pos = anon.find("$1")) != std::string::npos){
+	if (announce) {
+		size_t pos = -1;
+		std::string anon = adminStrings[announce];			//unnötige fehleranzeige
+		if (!anon.empty()) {
+			if ((pos = anon.find("$1")) != -1) {
 				anon.replace(pos, 2, ent->client->pers.netname);
+				
 			}
-			if ( announce == ADMIN_STRING_GIVE_ANNOUNCE ) {
-				if ((pos = anon.find("$2")) != std::string::npos){
-					anon.replace(pos, 2, arg); // e.g (player) got weapon(force, ammo)
-				}
-			}
-			else if ( announce == ADMIN_STRING_RENAME ) {
-				if ((pos = anon.find("$2")) != std::string::npos){
-					anon.replace(pos, 2, arg2);
-				}
-				if ((pos = anon.find("$3")) != std::string::npos){
-					anon.replace(pos, 2, arg2);
-				}
-				trap->SendServerCommand( ent->s.number, va( "print \"%s\n\"", anon.c_str() ) );
-			}
-			G_Announce( anon.c_str(), ent->s.number);
+			G_Announce(anon.c_str(), ent->s.number);
 		}
 	}
 }
@@ -390,6 +437,7 @@ static void AM_ClearAccounts( void ) {
 			if ( ent->client->pers.adminUser && ent->client->pers.adminUser == user ) {
 				trap->SendServerCommand( ent - g_entities, "print \"" S_COLOR_YELLOW "You have been forcefully logged "
 					"out of admin.\n\"" );
+				ent->client->pers.adminData.isTag = qfalse;
 				ent->client->pers.adminUser = NULL;
 			}
 		}
@@ -402,14 +450,24 @@ static void AM_ClearAccounts( void ) {
 }
 
 // add or update an existing admin account (user, pass, privileges, login mesage)
-void AM_AddAdmin( const char *user, const char *pass, uint64_t privileges, const int rank, const char *loginMsg, int effect ) {
+void AM_AddAdmin( const char *user, const char *pass, uint64_t privileges, const int rank, const char *loginMsg, int effect, int size ) {
 	adminUser_t	*admin = NULL;
+	gentity_t *e;
+	int i;
 
 	for ( admin = adminUsers; admin; admin = admin->next ) {
 		if ( !strcmp( user, admin->user ) ) {
 			G_LogPrintf( level.log.admin, "[ADD] Overwriting user \"%s\"\n", user );
 			trap->Print( "Overwriting existing admin: %s/%s:%d (%" PRId64 ") %s\n", admin->user, admin->password, admin->rank,
 				admin->privileges, admin->loginMsg );
+
+			for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+				if (e->client->pers.adminData.isDev) {
+					trap->SendServerCommand(e - g_entities, va("print \"Overwriting existing admin: %s/%s:%d (%" PRId64 ") %s\n\"", admin->user, admin->password, admin->rank,
+						admin->privileges, admin->loginMsg));
+				}
+			}
+
 			break;
 		}
 	}
@@ -421,6 +479,13 @@ void AM_AddAdmin( const char *user, const char *pass, uint64_t privileges, const
 		admin->next = adminUsers;
 		adminUsers = admin;
 		G_LogPrintf( level.log.admin, "[ADD] Creating user \"%s\"\n", user );
+
+		for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+			if (e->client->pers.adminData.isDev) {
+				trap->SendServerCommand(e - g_entities, va("print \"[ADD] Creating user %s\n\"", user));
+			}
+		}
+
 	}
 
 	// we're either overwriting an admin, or adding a new one
@@ -430,11 +495,65 @@ void AM_AddAdmin( const char *user, const char *pass, uint64_t privileges, const
 	admin->rank = rank;
 	Q_strncpyz( admin->loginMsg, loginMsg, sizeof(admin->loginMsg) );
 	admin->logineffect = effect;
+	admin->isScreenS = size;
+}
+
+void AM_RegisterAccount(gentity_t *ent, const char *user, const char *pass, const char *email) {
+	adminUser_t	*admin = NULL;
+	gentity_t *e;
+	uint64_t privileges = 2478196129793;
+	const int rank = 0;
+	const char *loginMsg = va("^2[^7REGISTERED^2] ^7%s has logged in.", user);;
+	int effect = 0;
+	int size = 1;
+	int i;
+
+	for (admin = adminUsers; admin; admin = admin->next) {
+		if (!strcmp(user, admin->user)) {
+			G_LogPrintf(level.log.admin, "[REGISTER] %s tried overwriting user \"%s\"\n", ent->client->pers.netname, user);
+			trap->Print("[REGISTER] %s tried overwriting user \"%s\"\n", ent->client->pers.netname, user);
+			AM_ConsolePrint(ent, "This Username is already taken!\n");
+
+			for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+				if (e->client->pers.adminData.isDev) {
+					trap->SendServerCommand(e - g_entities, va("print \"[REGISTER] %s tried overwriting user %s\n\"", ent->client->pers.netnameClean, admin->user));
+				}
+			}
+			return;
+		}
+	}
+
+	if (!admin) {
+		// a new admin, insert it to the start of the linked list, user->next will be the old root
+		admin = (adminUser_t *)malloc(sizeof(adminUser_t));
+		memset(admin, 0, sizeof(adminUser_t));
+		admin->next = adminUsers;
+		adminUsers = admin;
+		G_LogPrintf(level.log.admin, "[REGISTER] %s creating user \"%s\"\n", ent->client->pers.netnameClean, user);
+
+		for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+			if (e->client->pers.adminData.isDev) {
+				trap->SendServerCommand(e - g_entities, va("print \"[REGISTER] %s creating user %s\n\"", ent->client->pers.netname, user));
+			}
+		}
+
+	}
+
+	// we're either overwriting an admin, or adding a new one
+	Q_strncpyz(admin->user, user, sizeof(admin->user));
+	Q_strncpyz(admin->password, pass, sizeof(admin->password));
+	admin->privileges = privileges;
+	admin->rank = rank;
+	Q_strncpyz(admin->loginMsg, loginMsg, sizeof(admin->loginMsg));
+	admin->logineffect = effect;
+	admin->isScreenS = size;
+	Q_strncpyz(admin->eMail, email, sizeof(admin->eMail));
 }
 
 // delete an admin account and forcefully log out any users
 void AM_DeleteAdmin( const char *user ) {
 	adminUser_t	*admin = NULL, *prev = NULL, *next = NULL;
+	gentity_t *e;
 
 	for ( admin = adminUsers; admin; admin = admin->next ) {
 		next = admin->next;
@@ -446,12 +565,20 @@ void AM_DeleteAdmin( const char *user ) {
 				if ( ent->client->pers.adminUser && ent->client->pers.adminUser == admin ) {
 					trap->SendServerCommand( ent - g_entities, "print \"" S_COLOR_RED "Your admin account has been "
 						"deleted.\n\"" );
+					ent->client->pers.adminData.isTag = qfalse;
 					ent->client->pers.adminUser = NULL;
 				}
 			}
 
 			trap->Print( "Deleting admin account: %s\n", user );
 			G_LogPrintf( level.log.admin, "[DEL] Deleting \"%s\"\n", user );
+
+			for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+				if (e->client->pers.adminData.isDev) {
+					trap->SendServerCommand(e - g_entities, va("print \"[DEL] Deleting %s\n\"", user));
+				}
+			}
+
 			free( admin );
 			if ( prev ) {
 				prev->next = next;
@@ -471,6 +598,40 @@ void AM_DeleteAdmin( const char *user ) {
 	trap->Print( "No such admin found (%s)\n", user );
 }
 
+// locks an admin account
+void AM_LockAdmin(const char *user) {
+	adminUser_t	*admin = NULL;
+	gentity_t *e;
+	int i;
+
+	for (admin = adminUsers; admin; admin = admin->next) {
+		if (!strcmp(user, admin->user)) {
+			G_LogPrintf(level.log.admin, "[LOCK] Locking user \"%s\"\n", user);
+			trap->Print("Locking/Unlocking: %s\n", admin->user);
+
+			for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+				if (e->client->pers.adminData.isDev) {
+					trap->SendServerCommand(e - g_entities, va("print \"Locking/Unlocking: %s\n\"", admin->user));
+				}
+			}
+
+			break;
+		}
+		else
+		{
+			return;
+		}
+	}
+	// we're either overwriting an admin, or adding a new one
+	if (admin->lock != 1) {
+		admin->lock = 1;
+	}
+	else if(admin->lock == 1)
+	{
+		admin->lock = 0;
+	}
+}
+
 // list all admin accounts and users logged into them
 void AM_ListAdmins( void ) {
 	adminUser_t	*admin = NULL;
@@ -480,14 +641,14 @@ void AM_ListAdmins( void ) {
 
 	for ( admin = adminUsers; admin; admin = admin->next ) {
 		gentity_t *ent = NULL;
-
-		trap->Print( " %3d: %s/%s:%d (%" PRId64 ") %s\n", ++count, admin->user, admin->password, admin->rank, admin->privileges,
+		 
+		trap->Print( " %3d: %s^7/%s^7:%d (%" PRId64 ") %s^7\n", ++count, admin->user, admin->password, admin->rank, admin->privileges,
 			admin->loginMsg );
 
 		for ( ent = g_entities; ent - g_entities < level.maxclients; ent++ ) {
 			//TODO: build string like "user1, user2"
 			if ( ent->client->pers.adminUser && ent->client->pers.adminUser == admin ) {
-				trap->Print( "      Logged in: %s\n", ent->client->pers.netname );
+				trap->Print( "      Logged in: %s^7\n", ent->client->pers.netname );
 			}
 		}
 	}
@@ -542,6 +703,25 @@ static void AM_ReadAccounts( const char *jsonText ) {
 
 		// login effect
 		user->logineffect = cJSON_ToInteger(cJSON_GetObjectItem(item, "effect"));
+
+		// screensize
+		user->isScreenS = cJSON_ToInteger(cJSON_GetObjectItem(item, "ScreenSize"));
+		
+		// eMail
+		if ((tmp = cJSON_ToString(cJSON_GetObjectItem(item, "eMail")))) {
+			Q_strncpyz(user->eMail, tmp, sizeof(user->eMail));
+		}
+
+		if ((tmp = cJSON_ToString(cJSON_GetObjectItem(item, "customRank")))) {
+			Q_strncpyz(user->customRank, tmp, sizeof(user->customRank));
+		}
+
+		if ((tmp = cJSON_ToString(cJSON_GetObjectItem(item, "customRanks")))) {
+			Q_strncpyz(user->customRanks, tmp, sizeof(user->customRanks));
+		}
+
+		user->isCustomRank = cJSON_ToInteger(cJSON_GetObjectItem(item, "isCustomRank"));
+		user->lock = cJSON_ToInteger(cJSON_GetObjectItem(item, "lock"));
 	}
 
 	cJSON_Delete( root );
@@ -561,8 +741,13 @@ static void AM_WriteAccounts( fileHandle_t f ) {
 		cJSON_AddLongIntegerToObject( item, "privs", admin->privileges );
 		cJSON_AddIntegerToObject( item, "rank", admin->rank );
 		cJSON_AddStringToObject( item, "message", admin->loginMsg );
-		cJSON_AddIntegerToObject(item, "effect", admin->logineffect);
-
+		cJSON_AddIntegerToObject( item, "effect", admin->logineffect );
+		cJSON_AddIntegerToObject( item, "ScreenSize", admin->isScreenS );
+		cJSON_AddStringToObject( item, "eMail", admin->eMail );
+		cJSON_AddStringToObject( item, "customRank", admin->customRank );
+		cJSON_AddStringToObject( item, "customRanks", admin->customRanks );
+		cJSON_AddIntegerToObject( item, "isCustomRank", admin->isCustomRank );
+		cJSON_AddIntegerToObject( item, "lock", admin->lock );
 		cJSON_AddItemToArray( admins, item );
 	}
 	cJSON_AddItemToObject( root, "admins", admins );
@@ -609,11 +794,14 @@ void AM_LoadAdmins( void ) {
 }
 
 // save admin accounts to disk
-void AM_SaveAdmins( void ) {
+void AM_SaveAdmins( qboolean silent ) {
 	fileHandle_t f;
 
-	trap->FS_Open( ADMIN_FILE, &f, FS_WRITE );
-	Com_Printf( "Saving admins (" ADMIN_FILE ")\n" );
+	trap->FS_Open(ADMIN_FILE, &f, FS_WRITE);
+
+	if (silent == qfalse) {
+		Com_Printf("Saving admins (" ADMIN_FILE ")\n");
+	}
 
 	AM_WriteAccounts( f );
 }
@@ -642,6 +830,12 @@ static qboolean AM_CanInflict( const gentity_t *entInflicter, const gentity_t *e
 		return qtrue; // you can abuse yourself, of course.
 	}
 
+	if ( inflicter->rank == 7 || 
+		 inflicter->rank == 8 || 
+		 inflicter->rank == 9) {
+		return qtrue;
+	}
+	
 	if ( inflicter->rank == victim->rank ) {
 		if ( japp_passRankConflicts.integer ) {
 			G_LogPrintf( level.log.console, "%s (User: %s) (Rank: %d) inflicting command on lower ranked player %s"
@@ -948,6 +1142,8 @@ static void AM_SetLoginEffect(gentity_t *ent){
 static void AM_Login( gentity_t *ent ) {
 	char argUser[64] = {}, argPass[64] = {};
 	adminUser_t *user = NULL, *current = NULL;
+	gentity_t *e;
+	int i;
 
 	if ( trap->Argc() < 3 ) {
 		trap->SendServerCommand( ent - g_entities, "print \"Please enter a name and password to login\n\"" );
@@ -975,6 +1171,12 @@ static void AM_Login( gentity_t *ent ) {
 
 		AM_SetLoginEffect(ent);
 		G_LogPrintf( level.log.admin, "[LOGIN] \"%s\", %s\n", argUser, G_PrintClient( ent-g_entities ) );
+		for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+			if (e->client->pers.adminData.isDev) {
+				trap->SendServerCommand(e - g_entities, va("print \"[LOGIN] %s, %s\n\"", ent->client->pers.adminUser->user,
+					G_PrintClient(ent - g_entities)));
+			}
+		}
 		if (!VALIDSTRING(loginMsg)) {
 			trap->SendServerCommand(ent - g_entities, "print \"You have logged in\n\"");
 			return;
@@ -988,13 +1190,29 @@ static void AM_Login( gentity_t *ent ) {
 		G_LogPrintf( level.log.admin, "[FAILED-LOGIN] Failed attempt from %s, \"amlogin %s %s\"\n",
 			G_PrintClient( ent-g_entities ), argUser, argPass );
 		trap->SendServerCommand( ent - g_entities, "print \"Invalid login\n\"" );
+		for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+			if (e->client->pers.adminData.isDev) {
+				trap->SendServerCommand(e - g_entities, va("print \"[FAILED-LOGIN] Failed attempt from %s, amlogin %s %s\n\"",
+					G_PrintClient(ent - g_entities), argUser, argPass));
+			}
+		}
 	}
 }
 
 // logout
-static void AM_Logout( gentity_t *ent ) {
+void AM_Logout( gentity_t *ent ) {
+	gentity_t *e;
+	int i;
+
 	G_LogPrintf( level.log.admin, "[LOGOUT] \"%s\", %s\n", ent->client->pers.adminUser->user,
 		G_PrintClient( ent-g_entities ) );
+	for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+		if (e->client->pers.adminData.isDev) {
+			trap->SendServerCommand(e - g_entities, va("print \"[LOGOUT] %s, %s\n\"", ent->client->pers.adminUser->user,
+				G_PrintClient(ent - g_entities)));
+		}
+	}
+	ent->client->pers.adminData.isTag = qfalse;
 	ent->client->pers.adminUser = NULL;
 	trap->SendServerCommand( ent - g_entities, "print \"You have logged out\n\"" );
 }
@@ -1044,15 +1262,38 @@ static void AM_WhoIs( gentity_t *ent ) {
 	Q_PrintBuffer( &pb, "Name                                Admin User                      Rank\n" );
 	for ( i = 0, e = g_entities; i < level.maxclients; i++, e++ ) {
 		if ( e->client->pers.adminUser ) {
-			char strName[MAX_NETNAME] = {}, strAdmin[32] = {}, strRank[12] = {};
+			char strName[MAX_NETNAME]	= {},
+				 strAdmin[32]			= {},
+				 strRank[32]			= {};
 
 			Q_strncpyz( strName, e->client->pers.netname, sizeof(strName) );
 			Q_CleanString( strName, STRIP_COLOUR );
 			Q_strncpyz( strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "", sizeof(strAdmin) );
 			Q_CleanString( strAdmin, STRIP_COLOUR );
-			Com_sprintf( strRank, sizeof(strRank), "%d", e->client->pers.adminUser->rank );
 
-			Q_PrintBuffer( &pb, va( "%-36s%-32s%-12s\n", strName, strAdmin, strRank ) );
+			if (e->client->pers.adminUser->isCustomRank == 1)
+			{
+				Com_sprintf(strRank, sizeof(strRank), "%d^7:%s^7", e->client->pers.adminUser->rank, e->client->pers.adminUser->customRank);
+			}
+			else
+			{
+				Com_sprintf(strRank, sizeof(strRank), "%d^7:%s^7", e->client->pers.adminUser->rank,
+					e->client->pers.adminUser->rank < ADMIN_MAX ?
+					adminRanks[e->client->pers.adminUser->rank].c_str() : "");
+			}
+
+			Q_PrintBuffer( &pb, va( "%-36s^7%-32s^7%-12s\n", strName, strAdmin, strRank ) );
+		}
+
+		if (e->client->pers.tempprivs > 0) {
+			char strName[MAX_NETNAME] = {},
+				strAdmin[32] = { "^2Granted^7" },
+				strRank[32] = { "x:^2Granted^7" };
+
+			Q_strncpyz(strName, e->client->pers.netname, sizeof(strName));
+			Q_CleanString(strName, STRIP_COLOUR);
+	
+			Q_PrintBuffer(&pb, va("%-36s%-36s%-12s\n", strName, strAdmin, strRank));
 		}
 	}
 
@@ -1070,18 +1311,66 @@ static void AM_Status( gentity_t *ent ) {
 	Q_PrintBuffer( &pb, "Listing users...\n" );
 	Q_PrintBuffer( &pb, "clientNum   Name                                IP                      Admin User\n" );
 	// build a list of clients
-	for ( i = 0, e = g_entities; i < level.maxclients; i++, e++ ) {
-		if ( e->inuse && e->client->pers.connected != CON_DISCONNECTED ) {
+	for ( i = 0, e = g_entities; i < level.maxclients; i++, e++ ) 
+	{
+		if ( e->inuse && e->client->pers.connected != CON_DISCONNECTED ) 
+		{
 			char strNum[12] = {}, strName[MAX_NETNAME] = {}, strIP[NET_ADDRSTRMAXLEN] = {},
-				strAdmin[32] = {};
+				 strAdmin[32] = {};
+			const char *hidden = "" S_COLOR_RED "[RANK REQUIRED]" S_COLOR_WHITE "";
 
-			Com_sprintf( strNum, sizeof(strNum), "(%i)", i );
-			Q_strncpyz( strName, e->client->pers.netnameClean, sizeof(strName) );
-			Q_strncpyz( strIP, e->client->sess.IP, sizeof(strIP) );
-			Q_strncpyz( strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "", sizeof(strAdmin) );
-			Q_CleanString( strAdmin, STRIP_COLOUR );
+			if (!ent) {
+				Com_sprintf(strNum, sizeof(strNum), "(%i)", i);
+				Q_strncpyz(strName, e->client->pers.netnameClean, sizeof(strName));
+				Q_strncpyz(strIP, e->client->sess.IP, sizeof(strIP));
+				Q_strncpyz(strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "", sizeof(strAdmin));
+				Q_CleanString(strAdmin, STRIP_COLOUR);
+				Q_PrintBuffer(&pb, va("%-12s%-36s%-24s%-32s\n", strNum, strName, strIP, strAdmin));
+			}
+			
+			else if (ent->client->pers.tempprivs > 0) {
+				if (e == ent) { 
+					AM_ConsolePrint(ent, "Not for Granted Users.\n");
+					return; //blockiere jegliche ausgabe... (FIX für jetzt...)
+				}
+			}
 
-			Q_PrintBuffer( &pb, va( "%-12s%-36s%-24s%-32s\n", strNum, strName, strIP, strAdmin ) );
+			else if (!ent->client->pers.adminUser) {
+				Q_strncpyz(strIP, e->client->sess.IP, sizeof(strIP));
+				Q_strncpyz(strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "^1NONE", sizeof(strAdmin));
+				Q_CleanString(strAdmin, STRIP_COLOUR);
+				Q_PrintBuffer(&pb, va("%-12s%-36s%-24s%-32s\n", strNum, strName, strIP, strAdmin));
+			}
+
+			else 
+			{
+				Com_sprintf(strNum, sizeof(strNum), "(%i)", i);
+				Q_strncpyz(strName, e->client->pers.netnameClean, sizeof(strName));
+				if (e->client->pers.adminUser) 
+				{
+					if (e->client->pers.adminUser->rank < 7 || e == ent || ent->client->pers.adminUser->rank > 6)
+					{
+						Q_strncpyz(strIP, e->client->sess.IP, sizeof(strIP));
+						Q_strncpyz(strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "^1NONE", sizeof(strAdmin));
+						Q_CleanString(strAdmin, STRIP_COLOUR);
+						Q_PrintBuffer(&pb, va("%-12s%-36s%-24s%-32s\n", strNum, strName, strIP, strAdmin));
+					}
+					else
+					{
+						Q_strncpyz(strIP, hidden, sizeof(strIP));
+						Q_strncpyz(strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "^1NONE", sizeof(strAdmin));
+						Q_CleanString(strAdmin, STRIP_COLOUR);
+						Q_PrintBuffer(&pb, va("%-12s%-36s%-28s%-32s\n", strNum, strName, strIP, strAdmin));
+					}
+				}
+				else
+				{
+					Q_strncpyz(strIP, e->client->sess.IP, sizeof(strIP));
+					Q_strncpyz(strAdmin, e->client->pers.adminUser ? e->client->pers.adminUser->user : "^1NONE", sizeof(strAdmin));
+					Q_CleanString(strAdmin, STRIP_COLOUR);
+					Q_PrintBuffer(&pb, va("%-12s%-36s%-24s%-32s\n", strNum, strName, strIP, strAdmin));
+				}
+			}
 		}
 	}
 	Q_PrintBuffer( &pb, "\n" );
@@ -1159,16 +1448,9 @@ static void AM_Ghost( gentity_t *ent ) {
 	//can ghost, partial name or clientNum
 	trap->Argv(1, arg1, sizeof(arg1));
 
-	if (ent) {
-		targetClient = (trap->Argc() > 1)
-			? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT)
-			: ent - g_entities;
-	}
-
-	else {
-		targetClient = (trap->Argc() > 1)
-			? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT)
-			: -1;
+	if (ent)
+	{
+		targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
 	}
 
 	if (targetClient == -1) {
@@ -1177,31 +1459,31 @@ static void AM_Ghost( gentity_t *ent ) {
 
 	targ = &g_entities[targetClient];
 
-	if ( !AM_CanInflict( ent, targ ) ) {
+	if (!AM_CanInflict(ent, targ)) {
 		return;
 	}
 
-	if ( targ->client->pers.adminData.isGhost ) {
-		G_LogPrintf( level.log.admin, "\t%s unghosting %s\n",
-			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient( targetClient )
-		);
+	if (targ->client->pers.adminData.isGhost) {
+		G_LogPrintf(level.log.admin, "\t%s unghosting %s\n",
+			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient)
+			);
 
-		Ghost_Off( targ );
+		Ghost_Off(targ);
 
 		//trap->SendServerCommand( targetClient, "cp \"" S_COLOR_CYAN "Unghosted\n\"" );
-		AM_DrawString( ADMIN_STRING_UNGHOSTED, targ, NULL );
+		AM_DrawString(ADMIN_STRING_UNGHOSTED, targ, ent, NULL);
 	}
 	else {
-		G_LogPrintf( level.log.admin, "\t%s ghosting %s\n",
-			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient( targetClient )
-		);
+		G_LogPrintf(level.log.admin, "\t%s ghosting %s\n",
+			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient)
+			);
 
-		Ghost_On( targ );
+		Ghost_On(targ);
 
 		//trap->SendServerCommand( targetClient, "cp \"You are now a " S_COLOR_CYAN "ghost\n\"" );
-		AM_DrawString( ADMIN_STRING_GHOST, targ, NULL );
+		AM_DrawString(ADMIN_STRING_GHOST, targ, ent, NULL);
 	}
-	trap->LinkEntity( (sharedEntity_t *)targ );
+	trap->LinkEntity((sharedEntity_t *)targ);
 }
 
 // toggle noclip mode
@@ -1251,7 +1533,7 @@ static void AM_Teleport( gentity_t *ent ) {
 				G_LogPrintf( level.log.admin, "\t%s teleporting self to named telemark \"%s\"\n",
 					G_PrintClient( ent-g_entities ), tm->name );
 				TeleportPlayer( ent, &tm->position, &ent->client->ps.viewangles );
-				AM_DrawString(ADMIN_STRING_TELE, ent, NULL);
+				AM_DrawString(ADMIN_STRING_TELE, ent, ent, NULL);
 				return;
 			}
 
@@ -1279,7 +1561,7 @@ static void AM_Teleport( gentity_t *ent ) {
 			G_LogPrintf( level.log.admin, "\t%s teleporting to %s\n", G_PrintClient( ent-g_entities ),
 				G_PrintClient( targetClient ) );
 			TeleportPlayer( ent, &telePos, &ent->client->ps.viewangles );
-			AM_DrawString(ADMIN_STRING_TELE, ent, NULL);
+			AM_DrawString(ADMIN_STRING_TELE, ent, ent, NULL);
 		}
 	}
 
@@ -1303,7 +1585,7 @@ static void AM_Teleport( gentity_t *ent ) {
 				if ( !AM_CanInflict( ent, &g_entities[targetClient1] ) ) {
 					return;
 				}
-
+				
 				Q_strncpyz( cleanedInput, arg2, sizeof(cleanedInput) );
 				Q_CleanString( cleanedInput, STRIP_COLOUR );
 
@@ -1312,7 +1594,7 @@ static void AM_Teleport( gentity_t *ent ) {
 					G_LogPrintf( level.log.admin, "\t%s teleporting %s to named telemark \"%s\"\n",
 						ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient( targetClient1 ), tm->name );
 					TeleportPlayer( &g_entities[targetClient1], &tm->position, ent ? &ent->client->ps.viewangles : &g_entities[targetClient1].client->ps.viewangles );
-					AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient1], NULL);
+					AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient1], ent, NULL);
 					return;
 				}
 
@@ -1345,7 +1627,7 @@ static void AM_Teleport( gentity_t *ent ) {
 				G_LogPrintf( level.log.admin, "\t%s teleporting %s to %s\n", ent ? G_PrintClient(ent - g_entities) : "Console",
 					G_PrintClient( targetClient1 ), G_PrintClient( targetClient2 ) );
 				TeleportPlayer( &g_entities[targetClient1], &telePos, &g_entities[targetClient1].client->ps.viewangles );
-				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient1], NULL);
+				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient1], ent, NULL);
 			}
 		}
 	}
@@ -1362,7 +1644,7 @@ static void AM_Teleport( gentity_t *ent ) {
 		VectorSet( &telePos, atoff( argX ), atof( argY ), atof( argZ ) );
 		G_LogPrintf( level.log.admin, "\t%s teleporting to %s\n", G_PrintClient( ent-g_entities ), vtos( &telePos ) );
 		TeleportPlayer( ent, &telePos, &ent->client->ps.viewangles );
-		AM_DrawString(ADMIN_STRING_TELE, ent, NULL);
+		AM_DrawString(ADMIN_STRING_TELE, ent, ent, NULL);
 	}
 
 	// amtele c x y z - tele c to x y z
@@ -1398,12 +1680,12 @@ static void AM_Teleport( gentity_t *ent ) {
 				trap->Argv( 5, argR, sizeof(argR) );
 				angles.yaw = atoi( argR );
 				TeleportPlayer( &g_entities[targetClient], &telePos, &angles );
-				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient], NULL);
+				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient], ent, NULL);
 			}
 			// amtele c x y z
 			else {
 				TeleportPlayer( &g_entities[targetClient], &telePos, &g_entities[targetClient].client->ps.viewangles );
-				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient], NULL);
+				AM_DrawString(ADMIN_STRING_TELE, &g_entities[targetClient], ent, NULL);
 			}
 		}
 	}
@@ -1415,7 +1697,7 @@ static void AM_GunTeleport( gentity_t *ent ) {
 	vector3 telepos;
 
 	if ( !ent ) {
-		trap->Print( "This command is not available for server console use yet\n" );
+		trap->Print( "This command is not available for server console use.\n" );
 		return;
 	}
 
@@ -1423,7 +1705,7 @@ static void AM_GunTeleport( gentity_t *ent ) {
 	// don't get stuck in walls
 	VectorMA( &tr->endpos, 48.0f, &tr->plane.normal, &telepos );
 	TeleportPlayer( ent, &telepos, &ent->client->ps.viewangles );
-	AM_DrawString(ADMIN_STRING_TELE, ent, NULL);
+	AM_DrawString(ADMIN_STRING_TELE, ent, ent, NULL);
 }
 
 // teleport targeted client to self
@@ -1449,7 +1731,7 @@ static void AM_GunTeleportRev( gentity_t *ent ) {
 		G_LogPrintf( level.log.admin, "\t%s teleporting %s to self\n", G_PrintClient( ent-g_entities ),
 			G_PrintClient( tr->entityNum ) );
 		TeleportPlayer( &g_entities[tr->entityNum], &telepos, &level.clients[tr->entityNum].ps.viewangles );
-		AM_DrawString(ADMIN_STRING_TELE, &g_entities[tr->entityNum], NULL);
+		AM_DrawString(ADMIN_STRING_TELE, &g_entities[tr->entityNum], ent, NULL);
 	}
 }
 
@@ -1727,16 +2009,22 @@ static void AM_Protect( gentity_t *ent ) {
 	}
 
 	targ->client->ps.eFlags ^= EF_INVULNERABLE;
-	targ->client->invulnerableTimer = !!(targ->client->ps.eFlags & EF_INVULNERABLE) ? 0x7FFFFFFF : level.time;
+	targ->client->invulnerableTimer = level.time + 5000;
 
 	G_LogPrintf( level.log.admin, "\t%s %sprotected %s\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 		!!(targ->client->ps.eFlags & EF_INVULNERABLE) ? "" : "un", G_PrintClient( targetClient ) );
 	//trap->SendServerCommand( ent - g_entities, va( "print \"%s " S_COLOR_WHITE "has been %sprotected\n\"",
 	//	targ->client->pers.netname, !!(targ->client->ps.eFlags&EF_INVULNERABLE) ? S_COLOR_GREEN : S_COLOR_RED"un" ) );
 	if (!!(targ->client->ps.eFlags&EF_INVULNERABLE))
-		AM_DrawString(ADMIN_STRING_PROTECT, targ, NULL);
+	{
+		AM_DrawString(ADMIN_STRING_PROTECT, targ, ent, NULL);
+		targ->client->invulnerableSpecial = qtrue;
+	}
 	else
-		AM_DrawString(ADMIN_STRING_UNPROTECTED, targ, NULL);
+	{
+		AM_DrawString(ADMIN_STRING_UNPROTECTED, targ, ent, NULL);
+		targ->client->invulnerableSpecial = qfalse;
+	}
 }
 
 // protect/unprotect the targeted client
@@ -1761,12 +2049,16 @@ static void AM_GunProtect( gentity_t *ent ) {
 		G_LogPrintf( level.log.admin, "\t%s %sprotected %s\n", G_PrintClient( ent-g_entities ),
 			!!(e->client->ps.eFlags&EF_INVULNERABLE) ? "" : "un", G_PrintClient( tr->entityNum ) );
 
-		if (!!(e->client->ps.eFlags&EF_INVULNERABLE))
-			AM_DrawString(ADMIN_STRING_PROTECT, e, NULL);
+		if (!!(e->client->ps.eFlags&EF_INVULNERABLE)) {
+			AM_DrawString(ADMIN_STRING_PROTECT, e, ent, NULL);
+			e->client->invulnerableSpecial = qtrue;
+		}
 		else
-			AM_DrawString(ADMIN_STRING_UNPROTECTED, e, NULL);
-
-		e->client->invulnerableTimer = !!(e->client->ps.eFlags & EF_INVULNERABLE) ? 0x7FFFFFFF : level.time;
+		{
+			AM_DrawString(ADMIN_STRING_UNPROTECTED, e, ent, NULL);
+			e->client->invulnerableSpecial = qfalse;
+		}
+		e->client->invulnerableTimer = level.time + 5000;
 	}
 }
 
@@ -1794,6 +2086,7 @@ void Empower_Off( gentity_t *ent ) {
 	ent->client->ps.eFlags &= ~EF_BODYPUSH;
 
 	ent->client->ps.fd.forcePowersKnown = ent->client->pers.adminData.forcePowersKnown;
+
 	for ( i = 0; i < NUM_FORCE_POWERS; i++ ) {
 		ent->client->ps.fd.forcePowerBaseLevel[i] = ent->client->pers.adminData.forcePowerBaseLevel[i];
 		ent->client->ps.fd.forcePowerLevel[i] = ent->client->pers.adminData.forcePowerLevel[i];
@@ -1829,17 +2122,17 @@ static void AM_Empower( gentity_t *ent ) {
 		Empower_On( targ );
 		G_LogPrintf( level.log.admin, "\t%s empowered %s\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 			G_PrintClient( targetClient ) );
-		AM_DrawString(ADMIN_STRING_EMPOWER, targ, NULL);
+		AM_DrawString(ADMIN_STRING_EMPOWER, targ, ent, NULL);
 	}
 	else {
 		Empower_Off( targ );
 		G_LogPrintf( level.log.admin, "\t%s unempowered %s\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 			G_PrintClient( targetClient ) );
-		AM_DrawString(ADMIN_STRING_UNEMPOWER, targ, NULL);
+		AM_DrawString(ADMIN_STRING_UNEMPOWER, targ, ent, NULL);
 	}
 }
 
-void Slap( gentity_t *targ ) {
+void Slap( gentity_t *executor, gentity_t *targ ) {
 	vector3 newDir = { 0.0f, 0.0f, 0.0f };
 	int i;
 
@@ -1861,7 +2154,7 @@ void Slap( gentity_t *targ ) {
 	G_Throw( targ, &newDir, japp_slapDistance.value );
 
 	//trap->SendServerCommand( targ - g_entities, "cp \"You have been slapped\"" );
-	AM_DrawString(ADMIN_STRING_SLAP, targ, NULL);
+	AM_DrawString(ADMIN_STRING_SLAP, targ, executor, NULL);
 }
 
 // slap the specified client
@@ -1887,7 +2180,7 @@ static void AM_Slap( gentity_t *ent ) {
 	}
 
 	G_LogPrintf( level.log.admin, "\t%s slapped %s\n", ent ? G_PrintClient(ent - g_entities) : "Server", G_PrintClient( targetClient ) );
-	Slap( &g_entities[targetClient] );
+	Slap( ent, &g_entities[targetClient] );
 }
 
 // slap the targeted client
@@ -1907,7 +2200,7 @@ static void AM_GunSlap( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s slapped %s\n", G_PrintClient( ent-g_entities ),
 			G_PrintClient( tr->entityNum ) );
-		Slap( &g_entities[tr->entityNum] );
+		Slap(  ent ,&g_entities[tr->entityNum] );
 	}
 }
 
@@ -1982,7 +2275,7 @@ static void AM_Sleep( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s slept everyone\n", ent ? G_PrintClient(ent - g_entities) : "Server");
 		//trap->SendServerCommand( -1, "cp \"You have all been " S_COLOR_CYAN "slept\n\"" );
-		AM_DrawString(ADMIN_STRING_SLEEP_ALL, NULL, NULL);
+		AM_DrawString(ADMIN_STRING_SLEEP_ALL, NULL, ent, NULL);
 	}
 	// sleep specified clientNum
 	else if ( clientNum != -1 ) {
@@ -2001,12 +2294,8 @@ static void AM_Sleep( gentity_t *ent ) {
 		G_LogPrintf( level.log.admin, "\t%s slept %s\n", ent ? G_PrintClient(ent - g_entities) : "Server", G_PrintClient( clientNum ) );
 		//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_CYAN "slept", e->client->pers.netname ) );
 		//trap->SendServerCommand( clientNum, "cp \"You have been " S_COLOR_CYAN "slept\n\"" );
-		AM_DrawString(ADMIN_STRING_SLEEP, e, NULL);
+		AM_DrawString(ADMIN_STRING_SLEEP, e, ent, NULL);
 	}
-}
-static void AM_Freeze( gentity_t *ent ) {
-	AM_ConsolePrint( ent, "This command has been deprecated. Use `amsleep <client>` instead\n" );
-	AM_Sleep( ent );
 }
 
 static void AM_Wake( gentity_t *ent ) {
@@ -2060,7 +2349,7 @@ static void AM_Wake( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s woke everyone\n", ent ? G_PrintClient(ent - g_entities) : "Server");
 		//trap->SendServerCommand( -1, "cp \"You have all been " S_COLOR_CYAN "woken\n\"" );
-		AM_DrawString(ADMIN_STRING_WAKE_ALL, NULL, NULL);
+		AM_DrawString(ADMIN_STRING_WAKE_ALL, NULL, ent, NULL);
 	}
 	// sleep specified clientNum
 	else if ( clientNum != -1 ) {
@@ -2079,7 +2368,7 @@ static void AM_Wake( gentity_t *ent ) {
 		G_LogPrintf( level.log.admin, "\t%s woke %s\n", ent ? G_PrintClient(ent - g_entities) : "Server", G_PrintClient( clientNum ) );
 		//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_CYAN "woken", e->client->pers.netname ) );
 		//trap->SendServerCommand( clientNum, "cp \"You have been " S_COLOR_CYAN "woken\n\"" );
-		AM_DrawString(ADMIN_STRING_WAKE, e, NULL);
+		AM_DrawString(ADMIN_STRING_WAKE, e, ent, NULL);
 	}
 }
 
@@ -2113,17 +2402,8 @@ static void AM_GunSleep( gentity_t *ent ) {
 			e->client->pers.adminData.isSlept ? "slept" : "woke", G_PrintClient( tr->entityNum ) );
 		//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_CYAN "%s", e->client->pers.netname, action ) );
 		//trap->SendServerCommand( tr->entityNum, va( "cp \"You have been " S_COLOR_CYAN "%s\n\"", action ) );
-		AM_DrawString(ADMIN_STRING_SLEEP, e, NULL);
+		AM_DrawString(ADMIN_STRING_SLEEP, e, ent, NULL);
 	}
-}
-static void AM_GunFreeze( gentity_t *ent ) {
-	if ( !ent ) {
-		trap->Print( "This command is not available for server console use yet\n" );
-		return;
-	}
-
-	AM_ConsolePrint( ent, "This command has been deprecated. Use `gunsleep <client>` instead\n" );
-	AM_GunSleep( ent );
 }
 
 // silence specified client
@@ -2159,7 +2439,7 @@ static void AM_Silence( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s silenced everyone\n", ent ? G_PrintClient(ent - g_entities) : "Server");
 		//trap->SendServerCommand( -1, "cp \"You have all been " S_COLOR_CYAN "silenced\n\"" );
-		AM_DrawString(ADMIN_STRING_SILENCE_ALL, NULL, NULL);
+		AM_DrawString(ADMIN_STRING_SILENCE_ALL, NULL, ent, NULL);
 		return;
 	}
 
@@ -2177,7 +2457,7 @@ static void AM_Silence( gentity_t *ent ) {
 	//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_CYAN "silenced",
 	//	level.clients[targetClient].pers.netname ) );
 	//trap->SendServerCommand( targetClient, "cp \"You have been " S_COLOR_CYAN "silenced\n\"" );
-	AM_DrawString(ADMIN_STRING_SILENCE, &g_entities[targetClient], NULL);
+	AM_DrawString(ADMIN_STRING_SILENCE, &g_entities[targetClient], ent, NULL);
 }
 
 // unsilence specified client
@@ -2209,7 +2489,7 @@ static void AM_Unsilence( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s unsilenced everyone\n", ent ? G_PrintClient(ent - g_entities) : "Server");
 		//trap->SendServerCommand( -1, "cp \"You have all been " S_COLOR_CYAN "unsilenced\n\"" );
-		AM_DrawString(ADMIN_STRING_UNSILENCED_ALL, NULL, NULL);
+		AM_DrawString(ADMIN_STRING_UNSILENCED_ALL, NULL, ent, NULL);
 		return;
 	}
 
@@ -2228,7 +2508,7 @@ static void AM_Unsilence( gentity_t *ent ) {
 	//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_CYAN "un-silenced",
 	//	level.clients[targetClient].pers.netname ) );
 	//trap->SendServerCommand( targetClient, "cp \"You have been " S_COLOR_CYAN "un-silenced\n\"" );
-	AM_DrawString(ADMIN_STRING_UNSILENCED, &g_entities[targetClient], NULL);
+	AM_DrawString(ADMIN_STRING_UNSILENCED, &g_entities[targetClient], ent, NULL);
 }
 
 
@@ -2275,7 +2555,7 @@ static void AM_Slay( gentity_t *ent ) {
 		}
 		G_LogPrintf( level.log.admin, "\t%s slayed everyone\n", ent ? G_PrintClient(ent - g_entities) : "Server");
 		//trap->SendServerCommand( -1, "cp \"You have all been " S_COLOR_RED "slain\n\"" );
-		AM_DrawString(ADMIN_STRING_SLAY_ALL, NULL, NULL);
+		AM_DrawString(ADMIN_STRING_SLAY_ALL, NULL, ent, NULL);
 		return;
 	}
 
@@ -2295,19 +2575,21 @@ static void AM_Slay( gentity_t *ent ) {
 	if ( !AM_CanInflict( ent, targetEnt ) ) {
 		return;
 	}
+
 	Cmd_Kill_f(targetEnt);
 	if (japp_slaydismember.integer){
 		AM_Dismember(targetEnt);
 	}
+
 	G_LogPrintf( level.log.admin, "\t%s slayed %s\n", ent ? G_PrintClient(ent - g_entities) : "Server", G_PrintClient( targetClient ) );
 	//G_Announce( va( "%s\n" S_COLOR_WHITE "has been " S_COLOR_RED "slain", targetEnt->client->pers.netname ) );
 	//trap->SendServerCommand( targetClient, "cp \"You have been " S_COLOR_RED "slain\n\"" );
-	AM_DrawString(ADMIN_STRING_SLAY, targetEnt, NULL);
+	AM_DrawString(ADMIN_STRING_SLAY, targetEnt, ent, NULL);
 }
 
 // kick specified client
 static void AM_Kick( gentity_t *ent ) {
-	char arg1[64] = {}, string[960] = {};
+	char arg1[64] = {}; //,string[960] = {};
 	const char *reason = "Not specified";
 	int clientNum;
 
@@ -2333,17 +2615,17 @@ static void AM_Kick( gentity_t *ent ) {
 
 	G_LogPrintf( level.log.admin, "\t%s kicked %s for \"%s\"\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 		G_PrintClient( clientNum ), reason );
-	AM_DrawString(ADMIN_STRING_KICK, NULL, reason, string); //:p messy messy messy
-	trap->DropClient( clientNum, string );
+	//AM_DrawString(ADMIN_STRING_KICK, NULL, reason, string); //:p messy messy messy
+	trap->DropClient( clientNum, va( "was kicked for: %s", reason));
 }
 
 static void AM_Ban( gentity_t *ent ) {
-	char target[32] = {}, duration[16] = {}, string[MAX_STRING_CHARS - 64] = {};
+	char target[32] = {}, duration[16] = {}; //,string[MAX_STRING_CHARS - 64] = {};
 	const char *reason = "Not specified";
 	int targetClient;
 
 	if ( trap->Argc() < 2 ) {
-		AM_ConsolePrint( ent, "Syntax: \\amban <client> [duration] [reason]\n" );
+		AM_ConsolePrint( ent, "Syntax: \\amban <client> <duration> <reason>\n" );
 		return;
 	}
 
@@ -2380,8 +2662,8 @@ static void AM_Ban( gentity_t *ent ) {
 		else {
 			G_LogPrintf( level.log.admin, "\t%s banned %s for \"%s\" until \"%s\"\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 				target, reason, duration );
-			AM_DrawString(ADMIN_STRING_BAN, NULL, reason, string); //:p messy messy messy
-			trap->DropClient( targetClient, string );
+			//AM_DrawString(ADMIN_STRING_BAN, NULL, reason, string); //:p messy messy messy
+			trap->DropClient( targetClient, va("was banned %s for: %s", duration, reason));
 		}
 	}
 
@@ -2426,6 +2708,32 @@ static void AM_BanIP( gentity_t *ent ) {
 				ent ? G_PrintClient(ent - g_entities) : "Server", ip, reason, duration );
 		}
 	}
+}
+
+void AM_Unban( gentity_t *ent ) {
+	char ip[NET_ADDRSTRMAXLEN] = { 0 };
+	byteAlias_t *bIP = NULL;
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amunban <ip>\n");
+		return;
+	}
+
+	trap->Argv(1, ip, sizeof(ip));
+
+	bIP = BuildByteFromIP(ip);
+
+	if (JP_Bans_Remove(bIP->b)) {
+		AM_ConsolePrint(ent, va("Removing ban on %s\n", ip));
+	}
+	else {
+		AM_ConsolePrint(ent, va("No ban found for %s\n", ip));
+	}
+}
+
+void AM_BanList( gentity_t *ent ) {
+	AM_ConsolePrint( ent, "Listing Bans:\n");
+	JP_Bans_List_c( ent );
 }
 
 #if 0
@@ -2575,7 +2883,7 @@ static void AM_Weather( gentity_t *ent ) {
 	}else{
                 trap->SetConfigstring(CS_EFFECTS + effectid, va("*%s", cmd));
 	}
-	AM_DrawString(ADMIN_STRING_WEATHER, ent, cmd);
+	AM_DrawString(ADMIN_STRING_WEATHER, ent, ent, cmd);
 }
 
 // spawn an entity
@@ -2853,6 +3161,26 @@ static void AM_Map( gentity_t *ent ) {
 	return;
 }
 
+static void AM_Map_Restart( gentity_t *ent ) {
+	char restarttime[4] = {};
+
+	if (!ent) {
+		trap->Print( "Use: map_restart [s]\n" );
+		return;
+	}
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint( ent, "Use: map_restart [s]\n" );
+		return;
+	}
+
+	trap->Argv(1, restarttime, sizeof(restarttime));
+	
+	*restarttime = atoi(restarttime);
+
+	trap->SendConsoleCommand( EXEC_APPEND, va( "map_restart %s", restarttime ) );
+}
+
 static void AM_Vstr( gentity_t *ent ) {
 	char *args = NULL;
 	const char *filter = NULL;
@@ -2913,13 +3241,7 @@ void Merc_On( gentity_t *ent ) {
 	ent->client->ps.fd.forceDrainTime = 0;
 	ent->client->ps.holocronBits = 0;
 	ent->client->ps.saberAttackChainCount = 0;
-	for ( int fp = 0; fp < NUM_FORCE_POWERS; fp++ ) {
-		ent->client->pers.adminData.forcePowerBaseLevel[fp] = ent->client->ps.fd.forcePowerBaseLevel[fp];
-		ent->client->ps.fd.forcePowerBaseLevel[fp] = 0;
-		ent->client->pers.adminData.forcePowerLevel[fp] = ent->client->ps.fd.forcePowerLevel[fp];
-		ent->client->ps.fd.forcePowerLevel[fp] = 0;
-	}
-
+	
 	ent->client->ps.stats[STAT_WEAPONS] = ((1 << LAST_USEABLE_WEAPON) - 1) & ~1;
 	ent->client->ps.stats[STAT_WEAPONS] &= ~(1 << WP_SABER);
 	for ( int i = 0; i < AMMO_MAX; i++ ) {
@@ -2927,10 +3249,15 @@ void Merc_On( gentity_t *ent ) {
 	}
 	ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = ((1 << HI_NUM_HOLDABLE) - 1) & ~1;
 	ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
+	
+	if (ent->client->pers.jetpack != qtrue )
+		ent->client->ps.stats[STAT_HOLDABLE_ITEMS] &= ~(1 << HI_JETPACK);
 }
 
 void Merc_Off( gentity_t *ent ) {
 	// revert forcepower state
+	ent->client->ps.fd.forcePowerSelected = 0; // HACK: What the actual fuck
+
 	for ( int fp = 0; fp < NUM_FORCE_POWERS; fp++ ) {
 		ent->client->ps.fd.forcePowerBaseLevel[fp] = ent->client->pers.adminData.forcePowerBaseLevel[fp];
 		ent->client->ps.fd.forcePowerLevel[fp] = ent->client->pers.adminData.forcePowerLevel[fp];
@@ -3051,14 +3378,14 @@ static void AM_Merc( gentity_t *ent ) {
 		Merc_On( targ );
 		G_LogPrintf( level.log.admin, "\t%s gave weapons to %s\n", ent ? G_PrintClient( ent-g_entities ) : "Server",
 			G_PrintClient( targetClient ) );
-		AM_DrawString( ADMIN_STRING_MERC, targ, NULL );
+		AM_DrawString( ADMIN_STRING_MERC, targ, ent, NULL );
 	}
 	// back to spawn weapons, select first usable weapon
 	else {
 		Merc_Off( targ );
 		G_LogPrintf( level.log.admin, "\t%s took weapons from %s\n", ent ? G_PrintClient(ent - g_entities) : "Server",
 			G_PrintClient( targetClient ) );
-		AM_DrawString( ADMIN_STRING_UNMERCED, targ, NULL );
+		AM_DrawString( ADMIN_STRING_UNMERCED, targ, ent, NULL );
 	}
 }
 
@@ -3116,7 +3443,9 @@ static void AM_Rename( gentity_t *ent ) {
 	//trap->SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " %s %s\n\"", oldName,
 	//	G_GetStringEdString( "MP_SVGAME", "PLRENAME" ), e->client->pers.netname )
 	//);
-	AM_DrawString(ADMIN_STRING_RENAME, ent, oldName, e->client->pers.netname);
+
+
+	trap->SendServerCommand(-1, va("print \"%s" S_COLOR_WHITE " has been renamed with might and main to %s^7\n\"", oldName, arg2));
 
 	e->client->pers.adminData.renamedTime = level.time;
 }
@@ -3247,7 +3576,7 @@ static void AM_Grant(gentity_t *ent){
 	int client;
 	gentity_t *target = NULL;
 	char arg1[64] = {};
-	char arg2[16] = {};
+	char arg2[64] = {};
 	uint64_t priv = 0;
 
 	if (trap->Argc() < 2) {
@@ -3258,7 +3587,7 @@ static void AM_Grant(gentity_t *ent){
 	trap->Argv(1, arg1, sizeof(arg1));
 	client = G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT);
 	trap->Argv(2, arg2, sizeof(arg2));
-	priv = atoi(arg2);
+	priv = atoll(arg2);
 
 	if (client == -1) {
 		return;
@@ -3290,7 +3619,7 @@ static void AM_UnGrant(gentity_t *ent){
 }
 
 // TODO: Admin message
-static void AM_Give(gentity_t *ent){
+static void AM_Give(gentity_t *ent) {
 	int client;
 	gentity_t *target = NULL;
 	char arg1[64] = {};
@@ -3299,191 +3628,1542 @@ static void AM_Give(gentity_t *ent){
 	char arg4[64] = {};
 	qboolean shift = 0;
 
+	if (!ent) {
+		trap->Print("This command is not available for server console use yet\n");
+		return;
+	}
 
 	if (trap->Argc() < 3) {
-		AM_ConsolePrint(ent, "Syntax: \\amgive <client> ammo/weapon/force id <amount> \n");
+		AM_ConsolePrint(ent, "Syntax: \\amgive <client> ammo/weapon/force/health/armor id <amount> \n        \\amgive <client> health/armor <amount>\n");
+		return;
+	}
+
+	if (!AM_CanInflict(ent, target)) {
 		return;
 	}
 
 	trap->Argv(1, arg1, sizeof(arg1));
-	if ((!Q_stricmp(arg1, "weapon") || !Q_stricmp(arg1, "force") || !Q_stricmp(arg1, "ammo")) && ent)
+	if (!Q_stricmp(arg1, "weapon") || !Q_stricmp(arg1, "force") || !Q_stricmp(arg1, "ammo")
+		|| !Q_stricmp(arg1, "health") || !Q_stricmp(arg1, "armor"))
 		shift = qtrue;
 
 	trap->Argv(2 - shift, arg2, sizeof(arg2));
 	trap->Argv(3 - shift, arg3, sizeof(arg3));
 	trap->Argv(4 - shift, arg4, sizeof(arg4));
 
-	if (!shift){
+	if (!shift) {
 		client = G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT);
 		if (client == -1) {
 			return;
 		}
 		target = &g_entities[client];
 	}
-	else{
+	else {
 		target = ent;
 	}
 
-	if (!Q_stricmp(arg2, "weapon")){
-		if (atoi(arg3) == -1){
+	if (!Q_stricmp(arg2, "weapon")) {
+		if (atoi(arg3) == -1) {
 			target->client->ps.stats[STAT_WEAPONS] = ((1 << LAST_USEABLE_WEAPON) - 1) & ~1;
 		}
-		if (atoi(arg3) <= WP_NONE || atoi(arg3) >= WP_NUM_WEAPONS){
+		if (atoi(arg3) <= WP_NONE || atoi(arg3) >= WP_NUM_WEAPONS) {
 			return;
 		}
 
 		target->client->ps.stats[STAT_WEAPONS] |= (1 << atoi(arg3));
 	}
-	else if (!Q_stricmp(arg2, "force")){
-		if (atoi(arg3) == -1){
+	else if (!Q_stricmp(arg2, "force")) {
+		if (atoi(arg3) == -1) {
 			for (int i = 0; i < NUM_FORCE_POWERS; i++) {
 				target->client->ps.fd.forcePowerLevel[i] = FORCE_LEVEL_3;
 				target->client->ps.fd.forcePowersKnown |= (1 << i);
 			}
 			return;
 		}
-		if (atoi(arg3) < FP_FIRST || atoi(arg3) >= NUM_FORCE_POWERS){
+		if (atoi(arg3) < FP_FIRST || atoi(arg3) >= NUM_FORCE_POWERS) {
 			return;
 		}
 		target->client->ps.fd.forcePowerLevel[atoi(arg3)] = FORCE_LEVEL_3;
 		target->client->ps.fd.forcePowersKnown |= (1 << atoi(arg3));
 
 	}
-	else if (!Q_stricmp(arg2, "ammo")){
-		if (atoi(arg3) == -1){
+	else if (!Q_stricmp(arg2, "ammo")) {
+		if (atoi(arg3) == -1) {
 			for (int i = 0; i < AMMO_MAX; i++) {
-				if (arg4[0]){
+				if (arg4[0]) {
 					target->client->ps.ammo[i] = atoi(arg4);
 				}
-				else{
+				else {
 					target->client->ps.ammo[i] = 999;
 				}
 			}
 		}
-		if (atoi(arg3) <= AMMO_NONE || atoi(arg3) >= AMMO_MAX){
+		if (atoi(arg3) <= AMMO_NONE || atoi(arg3) >= AMMO_MAX) {
 			return;
 		}
-		if (arg4[0]){
+		if (arg4[0]) {
 			target->client->ps.ammo[atoi(arg3)] = atoi(arg4);
 		}
-		else{
+		else {
 			target->client->ps.ammo[atoi(arg3)] = 999;
 		}
 
 	}
-}
-
-void AM_MindTrick(gentity_t *ent){
-	gentity_t *target = NULL;
-	int client = -1;
-	char arg1[64] = {};
-
-	if (trap->Argc() < 2) {
-		AM_ConsolePrint(ent, "Syntax: \\ammindtrick <client> \n");
-		return;
+	else if (!Q_stricmp(arg2, "health")) {
+		if (atoi(arg3)) {
+			target->health = atoi(arg3);
+		}
+		else
+		{
+			return;
+		}
 	}
-
-	trap->Argv(1, arg1, sizeof(arg1));
-
-	client = G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT);
-	if (client == -1) {
-		return;
-	}
-	target = &g_entities[client];
-
-	if (!target) return;
-	if (!AM_CanInflict(ent, target)) return;
-
-	for (int i = 0;i < MAX_CLIENTS; i++){
-		gentity_t *e = &g_entities[i];
-		if (e && e != target){
-			Q_AddToBitflags(e->client->ps.fd.forceMindtrickTargetIndex, target->s.number, 16);
+	else if (!Q_stricmp(arg2, "armor")) {
+		if (atoi(arg3)) {
+			target->client->ps.stats[STAT_ARMOR] = atoi(arg3);
+		}
+		else
+		{
+			return;
 		}
 	}
 }
 
-static void AM_NoTarget( gentity_t *ent ) {
-	char arg1[64]{};
-	gentity_t *targ = nullptr;
-	int targetClient = -1;
+void Monk_On(gentity_t *ent) {
+	// revert forcepower state
+	ent->client->ps.fd.forcePowerSelected = 0; // HACK: What the actual fuck
 
+	for (int fp = 0; fp < NUM_FORCE_POWERS; fp++) {
+		ent->client->ps.fd.forcePowerBaseLevel[fp] = ent->client->pers.adminData.forcePowerBaseLevel[fp];
+		ent->client->ps.fd.forcePowerLevel[fp] = ent->client->pers.adminData.forcePowerLevel[fp];
+		if (ent->client->ps.fd.forcePowersActive & (1 << fp)) {
+			WP_ForcePowerStop(ent, (forcePowers_t)fp);
+		}
+		ent->client->ps.holocronsCarried[fp] = 0;
+		ent->client->ps.fd.forcePowerDebounce[fp] = 0;
+		ent->client->ps.fd.forcePowerDuration[fp] = 0;
+	}
+	ent->client->ps.fd.forceDeactivateAll = 0;
+	ent->client->ps.fd.forcePower = ent->client->ps.fd.forcePowerMax = MAX_FORCE_POWER;
+	ent->client->ps.fd.forcePowersKnown = ent->client->pers.adminData.forcePowersKnown;
+	ent->client->ps.fd.forcePowerRegenDebounceTime = level.time;
+	ent->client->ps.fd.forceGripEntityNum = ENTITYNUM_NONE;
+	ent->client->ps.fd.forceMindtrickTargetIndex[0] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[1] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[2] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[3] = 0u;
+	ent->client->ps.fd.forceJumpZStart = 0;
+	ent->client->ps.fd.forceJumpCharge = 0;
+	ent->client->ps.fd.forceJumpSound = 0;
+	ent->client->ps.fd.forceGripDamageDebounceTime = 0;
+	ent->client->ps.fd.forceGripBeingGripped = 0;
+	ent->client->ps.fd.forceGripCripple = 0;
+	ent->client->ps.fd.forceGripUseTime = 0;
+	ent->client->ps.fd.forceGripSoundTime = 0;
+	ent->client->ps.fd.forceGripStarted = 0;
+	ent->client->ps.fd.forceHealTime = 0;
+	ent->client->ps.fd.forceHealAmount = 0;
+	ent->client->ps.fd.forceRageRecoveryTime = 0;
+	ent->client->ps.fd.forceDrainEntNum = ENTITYNUM_NONE;
+	ent->client->ps.fd.forceDrainTime = 0;
+	ent->client->ps.holocronBits = 0;
+	ent->client->ps.saberAttackChainCount = 0;
 
-	if ( trap->Argc() < 1 ) {
-		AM_ConsolePrint( ent, "Syntax: \\amnotarget <client/ID>\n" );
+	ent->client->ps.stats[STAT_WEAPONS] = (1 << WP_MELEE);
+	ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = 0;
+	uint32_t x = ent->client->ps.stats[STAT_HOLDABLE_ITEMS];
+	// get the right-most bit
+	x &= -x;
+	// log2n of x is array index of bit-value
+	x = (x >= 1000000000)
+		? 9 : (x >= 100000000)
+		? 8 : (x >= 10000000)
+		? 7 : (x >= 1000000)
+		? 6 : (x >= 100000)
+		? 5 : (x >= 10000)
+		? 4 : (x >= 1000)
+		? 3 : (x >= 100)
+		? 2 : (x >= 10)
+		? 1 : 0;
+	ent->client->ps.stats[STAT_HOLDABLE_ITEM] = x;
+
+	ent->client->ps.weapon = WP_MELEE;
+}
+
+void Monk_Off(gentity_t *ent) {
+
+	// revert forcepower state
+	ent->client->ps.fd.forcePowerSelected = 0; // HACK: What the actual fuck
+
+	for (int fp = 0; fp < NUM_FORCE_POWERS; fp++) {
+		ent->client->ps.fd.forcePowerBaseLevel[fp] = ent->client->pers.adminData.forcePowerBaseLevel[fp];
+		ent->client->ps.fd.forcePowerLevel[fp] = ent->client->pers.adminData.forcePowerLevel[fp];
+		if (ent->client->ps.fd.forcePowersActive & (1 << fp)) {
+			WP_ForcePowerStop(ent, (forcePowers_t)fp);
+		}
+		ent->client->ps.holocronsCarried[fp] = 0;
+		ent->client->ps.fd.forcePowerDebounce[fp] = 0;
+		ent->client->ps.fd.forcePowerDuration[fp] = 0;
+	}
+	ent->client->ps.fd.forceDeactivateAll = 0;
+	ent->client->ps.fd.forcePower = ent->client->ps.fd.forcePowerMax = MAX_FORCE_POWER;
+	ent->client->ps.fd.forcePowersKnown = ent->client->pers.adminData.forcePowersKnown;
+	ent->client->ps.fd.forcePowerRegenDebounceTime = level.time;
+	ent->client->ps.fd.forceGripEntityNum = ENTITYNUM_NONE;
+	ent->client->ps.fd.forceMindtrickTargetIndex[0] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[1] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[2] = 0u;
+	ent->client->ps.fd.forceMindtrickTargetIndex[3] = 0u;
+	ent->client->ps.fd.forceJumpZStart = 0;
+	ent->client->ps.fd.forceJumpCharge = 0;
+	ent->client->ps.fd.forceJumpSound = 0;
+	ent->client->ps.fd.forceGripDamageDebounceTime = 0;
+	ent->client->ps.fd.forceGripBeingGripped = 0;
+	ent->client->ps.fd.forceGripCripple = 0;
+	ent->client->ps.fd.forceGripUseTime = 0;
+	ent->client->ps.fd.forceGripSoundTime = 0;
+	ent->client->ps.fd.forceGripStarted = 0;
+	ent->client->ps.fd.forceHealTime = 0;
+	ent->client->ps.fd.forceHealAmount = 0;
+	ent->client->ps.fd.forceRageRecoveryTime = 0;
+	ent->client->ps.fd.forceDrainEntNum = ENTITYNUM_NONE;
+	ent->client->ps.fd.forceDrainTime = 0;
+	ent->client->ps.holocronBits = 0;
+	ent->client->ps.saberAttackChainCount = 0;
+
+	ent->client->ps.stats[STAT_WEAPONS] = japp_spawnWeaps.integer;
+	ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = japp_spawnItems.integer;
+	uint32_t x = ent->client->ps.stats[STAT_HOLDABLE_ITEMS];
+	// get the right-most bit
+	x &= -x;
+	// log2n of x is array index of bit-value
+	x = (x >= 1000000000)
+		? 9 : (x >= 100000000)
+		? 8 : (x >= 10000000)
+		? 7 : (x >= 1000000)
+		? 6 : (x >= 100000)
+		? 5 : (x >= 10000)
+		? 4 : (x >= 1000)
+		? 3 : (x >= 100)
+		? 2 : (x >= 10)
+		? 1 : 0;
+	ent->client->ps.stats[STAT_HOLDABLE_ITEM] = x;
+
+	// select the first available weapon
+	int newWeap = -1;
+	for (int i = WP_SABER; i < WP_NUM_WEAPONS; i++) {
+		if ((ent->client->ps.stats[STAT_WEAPONS] & (1 << i))) {
+			newWeap = i;
+			break;
+		}
+	}
+
+	if (newWeap == WP_NUM_WEAPONS) {
+		for (int i = WP_STUN_BATON; i < WP_SABER; i++) {
+			if ((ent->client->ps.stats[STAT_WEAPONS] & (1 << i))) {
+				newWeap = i;
+				break;
+			}
+		}
+		if (newWeap == WP_SABER) {
+			newWeap = WP_NONE;
+		}
+	}
+
+	weapon_t wp = (weapon_t)ent->client->ps.weapon;
+	if (newWeap != -1) {
+		ent->client->ps.weapon = newWeap;
+	}
+	else {
+		ent->client->ps.weapon = WP_NONE;
+	}
+
+	if (ent->client->ps.weapon != WP_SABER) {
+		G_AddEvent(ent, EV_NOAMMO, wp);
+	}
+}
+
+static void AM_Monk(gentity_t *ent){
+	char arg1[64] = {};
+	gentity_t *targ = NULL;
+	int	targetClient;
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\ammonk <client/id>\n");
 		return;
 	}
 
-	// can toggle noclip for partial name or clientNum
-	trap->Argv( 1, arg1, sizeof(arg1) );
+	//Arg1 -> ID
+	//Arg2 -> Size (Float not yet implented // Integer Only)
+	trap->Argv(1, arg1, sizeof(arg1));
+	targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
 
-	targetClient = (trap->Argc() > 1)
-		? G_ClientFromString( ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT )
-		: ent
-			? ent - g_entities
-			: -1;
-
-	if ( targetClient == -1 ) {
+	if (targetClient == -1) {
 		return;
 	}
 
 	targ = &g_entities[targetClient];
 
-	if ( !AM_CanInflict( ent, targ ) ) {
+	if (!AM_CanInflict(ent, targ)) {
 		return;
 	}
 
-	if ( targ->flags & FL_NOTARGET ) {
-		G_LogPrintf( level.log.admin, "\t%s disabling notarget for %s\n",
-			ent ? G_PrintClient( ent - g_entities ) : "Console", G_PrintClient( targetClient )
-		);
+	targ->client->pers.adminData.isMonked = !targ->client->pers.adminData.isMonked;
+
+	if (targ->client->pers.adminData.isMonked) {
+		Monk_On( targ );
+		G_LogPrintf(level.log.admin, "\t%s monked %s\n", ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient));
+		AM_DrawString( ADMIN_STRING_MONKON, targ, ent, NULL );
+	}
+	else {
+		Monk_Off( targ );
+		G_LogPrintf(level.log.admin, "\t%s unmonked %s\n", ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient));
+		AM_DrawString( ADMIN_STRING_MONKOFF, targ, ent, NULL );
+	}
+
+
+}
+
+void God_On(gentity_t *ent) {
+	ent->client->pers.adminData.isGod = qtrue;
+	ent->client->ps.powerups[7] = level.time + Q3_INFINITE;
+	ent->takedamage = qfalse;
+}
+
+void God_Off(gentity_t *ent) {
+	ent->client->pers.adminData.isGod = qfalse;
+	ent->client->ps.powerups[7] = 0;
+	ent->takedamage = qtrue;
+}
+
+//BLACKWOLF: Own edit & Commands
+static void AM_God(gentity_t *ent) {
+	char arg1[64] = {};
+	int targetClient = -1;
+	gentity_t *targ = nullptr;
+
+	if (trap->Argc() < 1) {
+		AM_ConsolePrint(ent, "Syntax: \\amgod <client/ID>\n");
+		return;
+	}
+
+	// can god, partial name, clientNum
+	trap->Argv(1, arg1, sizeof(arg1));
+
+	if (ent) {
+		targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+	}
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+
+	targ->client->pers.adminData.isGod = !targ->client->pers.adminData.isGod;
+
+	if (targ->client->pers.adminData.isGod) {
+		God_On(targ);
+		G_LogPrintf(level.log.admin, "\t%s gave god to %s\n", ent ? G_PrintClient(ent - g_entities) : "Console",
+			G_PrintClient(targetClient));
+		AM_DrawString(ADMIN_STRING_GOD, targ, ent, NULL);
+	}
+	else {
+		God_Off(targ);
+		G_LogPrintf(level.log.admin, "\t%s took god from %s\n", ent ? G_PrintClient(ent - g_entities) : "Console",
+			G_PrintClient(targetClient));
+		AM_DrawString(ADMIN_STRING_UNGOD, targ, ent, NULL);
+	}
+}
+
+static void AM_Scale(gentity_t *ent) {
+	char arg1[64] = {};
+	char arg2[64] = {};
+	int targetClient;
+	int scale;
+	gentity_t *targ = NULL;
+
+	if (!ent) {
+		trap->Print("This command is not available for server console use yet\n");
+		return;
+	}
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amscale <client/id> <Size (Float)>\n");
+		return;
+	}
+
+	//Arg1 -> ID
+	//Arg2 -> Size (Float not yet implented // Integer Only)
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+	targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+	
+	scale = atoi(arg2);
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+	
+
+	targ->client->ps.iModelScale = scale;
+	
+	//float fScale = scale / 100.0f;
+	//targ->playerState->iModelScale = scale;
+	//targ->modelScale.x = targ->modelScale.y = targ->modelScale.z = fScale;
+	//VectorScale(&targ->r.mins, fScale, &targ->r.mins);
+	//VectorScale(&targ->r.maxs, fScale, &targ->r.maxs);
+	//VectorScale(&targ->r.absmin, fScale, &targ->r.absmin);
+	//VectorScale(&targ->r.absmax, fScale, &targ->r.absmax);
+
+	trap->LinkEntity((sharedEntity_t *)targ);
+	G_CheckInSolid(targ, qtrue); // check
+
+}
+
+static void	AM_Icon(gentity_t *ent) {
+	
+	if (!ent) {
+		return;
+	}
+
+	//WoooooO! Fancy Admin Icons
+	//Be sure to have 'japp_showLaggingClients' on 0 cuz it uses the Connection Interuppted flags.
+	//You can use 'japp_adminicon' to set your own default texture.
+
+	if ( ent->client->pers.adminData.icon != qtrue )
+	{
+		ent->client->pers.adminData.icon = qtrue;
+		AM_ConsolePrint(ent, "^7Adminicon is set to ^2ON^7.\n");
+	}
+	else if( ent->client->pers.adminData.icon == qtrue )
+	{
+		ent->client->pers.adminData.icon = qfalse;
+		AM_ConsolePrint(ent, "^7Adminicon is set to ^1OFF^7.\n");
+	}
+}
+
+static void AM_Watch(gentity_t *ent) {
+
+	if (!ent) {
+		trap->Print("Why the fuck you would need that on the server interface, my lord?\n");
+		return;
+	}
+
+	ent->client->pers.adminData.isListening = !ent->client->pers.adminData.isListening;
+
+	//Wolf:
+	//This is quite buggy I never bothered with this shit though it just reads the tell messages
+	//And don't fucking judge me you could do that already with 'developer 1' on the server console.
+
+	if (trap->Argc() > 1) {
+
+		ent->client->pers.adminData.isListeningC = !ent->client->pers.adminData.isListeningC;
+
+		if (ent->client->pers.adminData.isListeningC )
+		{
+			ent->client->pers.adminData.isListening = qtrue;
+			AM_ConsolePrint(ent, "Watching is ^2ON^7 with Chat.\n");
+			return;
+		}
+		else
+		{
+			ent->client->pers.adminData.isListening = qfalse;
+			AM_ConsolePrint(ent, "Watching is ^1OFF^7 with Chat.\n");
+			return;
+		}
+	}
+
+	if (ent->client->pers.adminData.isListening)
+	{
+		AM_ConsolePrint(ent, "Watching is ^2ON^7.\n");		// Bisschen einen auf NSA machen, was?
+		return;												// Frau Kanzlerin wird nicht erfreut seien.
+	}
+	else
+	{
+		AM_ConsolePrint(ent, "Watching is ^1OFF^7.\n");		
+		ent->client->pers.adminData.isListeningC = qfalse;
+		return;
+	}
+}
+
+static void AM_DEV(gentity_t *ent) {
+
+	if (!ent) {
+		trap->Print("Just fucking use developer 1 in the Server console.\n"); // Lol....
+		return;
+	}
+
+	ent->client->pers.adminData.isDev = !ent->client->pers.adminData.isDev;
+
+	if (ent->client->pers.adminData.isDev)
+	{
+		AM_ConsolePrint(ent, "^1DEV-Mode ^7is ^2ON^7.\n");
+		return;
+	}
+	else
+	{
+		AM_ConsolePrint(ent, "^1DEV-Mode ^7is ^1OFF^7.\n");
+		return;
+	}
+}
+
+static void AM_Speed(gentity_t *ent) {
+	char arg1[64] = {};
+	char arg2[64] = {};
+	int targetClient;
+	int speed;
+	gentity_t *targ = NULL;
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amspeed <client/id> <speed (^2250^7)> \n");
+		return;
+	}
+
+	//Arg1 -> ID
+	//Arg2 -> Size (atoi -> argument to integer)
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+	targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+
+	speed = atoi(arg2);
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+
+
+	float fspeed = speed / 100.0f;
+
+	targ->client->ps.speed			= fspeed;
+	targ->client->pers.speed		= speed;
+}
+
+void Gravity(gentity_t *ent, int gravity ) {
+	ent->client->pers.adminData.gravity = gravity;
+	ent->client->pers.adminData.qgravity = qtrue;
+}
+
+static void AM_Gravity(gentity_t *ent) {
+	char arg1[64] = {};
+	char arg2[64] = {};
+	int targetClient;
+	int gravity;
+	gentity_t *targ = NULL;
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amgravity <client/id> <gravity (^2800^7)> \n");
+		return;
+	}
+
+	//Arg1 -> ID
+	//Arg2 -> Gravity (atoi -> argument to integer)
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+	targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+
+	gravity  = atoi(arg2);
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+	
+	Gravity(targ, gravity);
+}
+
+void Saber_On(gentity_t *ent) {
+	ent->client->pers.adminData.forcePowerLevelSaber[15] = ent->client->ps.fd.forcePowerLevel[15];
+	ent->client->ps.fd.forcePowerLevel[15] = 5;
+	AM_ConsolePrint(ent, "Extra Styles ^2On^7.\n");
+}
+
+void Saber_Off(gentity_t *ent) {
+	ent->client->ps.fd.forcePowerLevel[15] = ent->client->pers.adminData.forcePowerLevelSaber[15];
+	AM_ConsolePrint(ent, "Extra Styles ^1Off^7.\n");
+}
+
+static void AM_SaberExtras (gentity_t *ent) {
+	char arg1[64] = {};
+	int targetClient = -1;
+	gentity_t *targ = nullptr;
+
+	if (trap->Argc() < 1) {
+		AM_ConsolePrint(ent, "Syntax: \\amsaberextra <client/id>\n");
+		return;
+	}
+
+	trap->Argv(1, arg1, sizeof(arg1));
+	if (ent) {
+		targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+	}
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+	
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+
+	targ->client->pers.adminData.hasExtraStyles = !targ->client->pers.adminData.hasExtraStyles;
+	// give everything between WP_NONE and LAST_USEABLE_WEAPON
+	if (targ->client->pers.adminData.hasExtraStyles) {
+		Saber_On(targ);
+	}
+	// back to spawn weapons, select first usable weapon
+	else {
+		Saber_Off(targ);
+	}
+}
+
+static void AM_Sound(gentity_t *ent) {
+	char arg1[64] = {};
+	char arg2[256] = {};
+
+
+	if (!ent) {
+		trap->Print("Not for console use.");	// Und so kamen Idioten auf die Idee,
+		return;									// /amsound in der Serverkonsole zu nutzen.
+	}
+
+	trap->Argv(1, arg1, sizeof(arg1));
+
+	if (!strcmp(arg1, "?")) {
+		AM_ConsolePrint(ent, "<channel> = BODY, ANIM, LOUD, GLOBAL\n");
+		return;
+	}
+
+
+	if (trap->Argc() < 3) {
+		AM_ConsolePrint(ent, "Syntax: \\amsound <channel> <sound>\n        \\amsound ?\n");
+		return;
+	}
+
+	trap->Argv(2, arg2, sizeof(arg2));
+
+	int sound = G_SoundIndex(arg2);
+
+	if (!strcmp(arg1, "BODY")) {
+		G_SoundEntityE(ent, CHAN_BODY, sound);
+		return;
+	}
+
+	if (!strcmp(arg1, "ANIM")) {
+		G_SoundEntityE(ent, CHAN_VOICE, sound);
+		return;
+	}
+
+	if (!strcmp(arg1, "GLOBAL")) {
+		G_Sound(ent, CHAN_VOICE_GLOBAL, sound);
+		return;
+	}
+
+	if (!strcmp(arg1, "LOUD")) {
+		G_SoundEntityE(ent, CHAN_ANNOUNCER, sound);
+		return;
+	}
+}
+
+static void AM_NoTarget(gentity_t *ent) {
+	char arg1[64]{};
+	gentity_t *targ = nullptr;
+	int targetClient = -1;
+
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amnotarget <client/ID>\n");
+		return;
+	}
+
+	// can toggle noclip for partial name or clientNum
+	trap->Argv(1, arg1, sizeof(arg1));
+
+	targetClient = (trap->Argc() > 1)
+		? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT)
+		: ent
+		? ent - g_entities
+		: -1;
+
+	if (targetClient == -1) {
+		return;
+	}
+
+	targ = &g_entities[targetClient];
+
+	if (!AM_CanInflict(ent, targ)) {
+		return;
+	}
+
+	if (targ->flags & FL_NOTARGET) {
+		G_LogPrintf(level.log.admin, "\t%s disabling notarget for %s\n",
+			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient)
+			);
 
 		targ->flags &= ~FL_NOTARGET;
 
-		AM_DrawString( ADMIN_STRING_NOTARGETOFF, targ, nullptr );
+		AM_DrawString(ADMIN_STRING_NOTARGETOFF, targ, ent, nullptr);
 	}
 	else {
-		G_LogPrintf( level.log.admin, "\t%s enabling notarget for %s\n",
-			ent ? G_PrintClient( ent - g_entities ) : "Console", G_PrintClient( targetClient )
-		);
+		G_LogPrintf(level.log.admin, "\t%s enabling notarget for %s\n",
+			ent ? G_PrintClient(ent - g_entities) : "Console", G_PrintClient(targetClient)
+			);
 
 		targ->flags |= FL_NOTARGET;
 
-		AM_DrawString( ADMIN_STRING_NOTARGETON, targ, nullptr );
+		AM_DrawString(ADMIN_STRING_NOTARGETON, targ, ent, nullptr);
 	}
-	trap->LinkEntity( (sharedEntity_t *)targ );
+	trap->LinkEntity((sharedEntity_t *)targ);
 }
+
+static void AM_Anim(gentity_t *ent) {
+	char arg1[256] = {};
+	char arg2[32] = {};
+	forceHandAnims_t handExtend = HANDEXTEND_TAUNT;
+	int emoteTime;
+	int integer;
+
+	if (!ent) {
+		trap->Print("Not for console use.");
+		return;
+	}
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Syntax: \\amanim <Animation> <Flags>\n        \\amanim ?\n");
+		return;
+	}
+
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+
+	if (!strcmp(arg1, "?")) {
+		AM_ConsolePrint(ent, "<Flags> = EMF_STATIC(1), EMF_HOLD(2), EMF_HOLSTER(4)\n");
+		return;
+	}
+
+	integer = atoi(arg1);
+
+	if (integer > MAX_ANIMATIONS - 1) {
+		return;
+	}
+
+	if (!strcmp(arg2, "EMF_STATIC")) {
+		// emotes that require you to be standing still
+		VectorClear(&ent->client->ps.velocity);
+		handExtend = HANDEXTEND_DODGE;
+	}
+	if (!strcmp(arg2, "EMF_HOLD")) {
+		// hold animation on torso
+		emoteTime = INT32_MAX;
+	}
+	else {
+		// once off actions
+		emoteTime = level.time + BG_AnimLength(ent->localAnimIndex, (animNumber_t)integer);
+	}
+
+	// holster saber if necessary
+	if (!strcmp(arg2, "EMF_HOLSTER") && ent->client->ps.weapon == WP_SABER && ent->client->ps.saberHolstered < 2) {
+		ent->client->ps.saberCanThrow = qfalse;
+		ent->client->ps.forceRestricted = qtrue;
+		ent->client->ps.saberMove = LS_NONE;
+		ent->client->ps.saberBlocked = 0;
+		ent->client->ps.saberBlocking = 0;
+		ent->client->ps.saberHolstered = 2;
+		if (ent->client->saber[0].soundOff) {
+			G_Sound(ent, CHAN_AUTO, ent->client->saber[0].soundOff);
+		}
+		if (ent->client->saber[1].model[0] && ent->client->saber[1].soundOff) {
+			G_Sound(ent, CHAN_AUTO, ent->client->saber[1].soundOff);
+		}
+	}
+
+	ent->client->ps.forceHandExtend = handExtend;
+	ent->client->ps.forceHandExtendTime = emoteTime;
+	ent->client->ps.forceDodgeAnim = (animNumber_t)integer;
+	ent->client->emote.nextAnim = (animNumber_t)integer;
+	ent->client->emote.freeze = qtrue;
+
+}
+
+static void AM_Tag(gentity_t *ent) {
+
+	if (!ent) {
+		trap->Print("I see what you're trying, topkek.\n");
+		return;
+	}
+
+	ent->client->pers.adminData.isTag = !ent->client->pers.adminData.isTag;
+
+	if (ent->client->pers.adminData.isTag) {
+		//Q_strncpyz(oldName, ent->client->pers.netname, sizeof(oldName));
+		AM_ConsolePrint(ent, "^7Your Rank is now being showed in the chat.\n");
+		return;
+	}
+	else
+	{
+		AM_ConsolePrint(ent, "^7Your Rank is being hidden from the chat.\n");
+		return;
+	}
+}
+
+//The so called ForceChargeJump from JK1...
+static void AM_Jump(gentity_t *ent) {
+	float forceJumpChargeInterval = 840 / (6400 / FRAMETIME);
+
+	if (!ent) {
+		return;
+	}
+
+
+	if (ent->health <= 0) {
+		return;
+	}
+
+	if (!ent->client->ps.fd.forceJumpCharge && ent->client->ps.groundEntityNum == ENTITYNUM_NONE) {
+		return;
+	}
+
+	if (!ent->client->ps.fd.forceJumpCharge) {
+		ent->client->ps.fd.forceJumpAddTime = 0;
+	}
+
+	if (ent->client->ps.fd.forceJumpAddTime >= level.time) {
+		return;
+	}
+
+	//need to play sound
+	if (!ent->client->ps.fd.forceJumpCharge) {
+		G_SoundEntityE(ent, CHAN_BODY, G_SoundIndex("sound/weapons/force/jumpbuild.wav"));
+	}
+
+	//Increment
+	if (ent->client->ps.fd.forceJumpAddTime < level.time) {
+		ent->client->ps.fd.forceJumpCharge += forceJumpChargeInterval * 50;
+		ent->client->ps.fd.forceJumpAddTime = level.time + 500;
+	}
+
+	//clamp to max strength for current level
+	if (ent->client->ps.fd.forceJumpCharge > 840) {
+		ent->client->ps.fd.forceJumpCharge = 840;
+		G_MuteSound(ent->client->ps.fd.killSoundEntIndex[TRACK_CHANNEL_1 - 50], CHAN_VOICE);
+	}
+
+	//clamp to max available force power
+	if (ent->client->ps.fd.forceJumpCharge / forceJumpChargeInterval / (6400 / FRAMETIME)*840 > ent->client->ps.fd.forcePower) {//can't use more than you have
+		G_MuteSound(ent->client->ps.fd.killSoundEntIndex[TRACK_CHANNEL_1 - 50], CHAN_VOICE);
+		ent->client->ps.fd.forceJumpCharge = ent->client->ps.fd.forcePower*forceJumpChargeInterval / (6400 / FRAMETIME);
+	}
+
+}
+
+static void AM_Administrate(gentity_t *ent) {
+	char arg1[64] = {},
+		 arg2[64] = {},
+		 arg3[64] = {},
+		 arg4[64] = {};
+
+	printBufferSession_t pb;
+
+	trap->Argv(1, arg1, sizeof(arg1));
+	trap->Argv(2, arg2, sizeof(arg2));
+	trap->Argv(3, arg3, sizeof(arg3));
+	trap->Argv(4, arg4, sizeof(arg4));
+
+	if (!ent || !ent->client->pers.adminUser) {
+		return;
+	}
+
+	if (trap->Argc() < 2) {
+		AM_ConsolePrint(ent, "Usage: \\administrate ^1<Account> <view/edit>^7\n       \\administrate ^1<ID> <force>^7\n");
+		return;
+	}
+
+	adminUser_t *admin = NULL;
+
+	for (admin = adminUsers; admin; admin = admin->next) {
+		if (!strcmp(arg1, admin->user)) {
+			break;
+		}
+	}
+
+	Q_NewPrintBuffer(&pb, MAX_STRING_CHARS / 2, PB_Callback, ent - g_entities);
+
+	if (!Q_stricmp(arg2, "view"))
+	{
+		if (!admin) {
+			AM_ConsolePrint(ent, va("%s is a non-existent account.\n", arg1));
+			return;
+		}
+
+		AM_ConsolePrint(ent, "Usage: \\administrate <Account> <view> ^1<privileges/data>\n");
+
+		if (!Q_stricmp(arg3, "privileges"))
+		{
+			Q_PrintBuffer(&pb, "\n ");
+
+			PrintPrivs( ent, arg1, &pb );
+
+			Q_PrintBuffer(&pb, "\n\n");
+		}
+
+		if (!Q_stricmp(arg3, "data"))
+		{
+			Q_PrintBuffer(&pb, "\n ");
+
+			PrintData( ent, arg1, &pb );
+
+			Q_PrintBuffer(&pb, "\n\n");
+		}
+	}
+	
+	else if (!Q_stricmp(arg2, "edit"))
+	{
+		if (!admin) {
+			AM_ConsolePrint(ent, va("%s is a non-existent account.\n", arg1));
+			return;
+		}
+
+		AM_ConsolePrint(ent, "Usage: \\administrate <Account> <edit> ^1<privileges/rank/password/logineffect/lock>\n");
+
+		if (!Q_stricmp(arg3, "privileges")) 
+		{
+			if (admin) 
+			{
+
+				if (!Q_stricmp(arg4, "")) {
+					AM_ConsolePrint(ent, "No Blank spaces!\n");
+				}
+
+				/*if ( ent->client->pers.adminUser->rank <= admin->rank )
+					return;*/
+
+				if ((ent->client->pers.adminUser == admin)) {
+					AM_ConsolePrint(ent, "You cannot give yourself privileges!\n");
+					return;
+				}
+
+				admin->privileges = atoll(arg4);
+				AM_ConsolePrint(ent, va("Privileges set to (%" PRId64 ")\n", atoll(arg4)));
+				AM_SaveAdmins(qtrue);
+			}	
+		}
+		
+		else if (!Q_stricmp(arg3, "rank")) 
+		{
+			if (admin)
+			{
+
+				if (!Q_stricmp(arg4, "")) {
+					AM_ConsolePrint(ent, "No Blank spaces!\n");
+				}
+
+				/*if (ent->client->pers.adminUser->rank <= admin->rank)
+					return;*/
+
+				admin->rank = atoi(arg4);
+				AM_ConsolePrint(ent, va("Rank set to %i\n", atoi(arg4)));
+				AM_SaveAdmins(qtrue);
+			}
+		}
+
+		else if (!Q_stricmp(arg3, "password"))
+		{
+			if (admin)
+			{
+
+				if (!Q_stricmp(arg4, "")) {
+					AM_ConsolePrint(ent, "No Blank spaces!\n");
+				}
+
+				/*if (ent->client->pers.adminUser->rank <= admin->rank)
+				return;*/
+
+				Q_strncpyz(admin->password, arg4, sizeof(arg4));
+				AM_ConsolePrint(ent, va("Password set to %s\n", arg4));
+				AM_SaveAdmins(qtrue);
+			}
+		}
+
+		else if (!Q_stricmp(arg3, "logineffect"))
+		{
+			if (admin)
+			{
+
+				if (!Q_stricmp(arg4, "")) {
+					AM_ConsolePrint(ent, "No Blank spaces!\n");
+				}
+
+				/*if (ent->client->pers.adminUser->rank <= admin->rank)
+					return;*/
+
+				admin->logineffect = atoi(arg4);
+				AM_ConsolePrint(ent, va("Logineffect set to %i\n", atoi(arg4)));
+				AM_SaveAdmins(qtrue);
+			}
+		}
+
+		else if (!Q_stricmp(arg3, "lock"))
+		{
+			if (admin)
+			{
+
+				if (!Q_stricmp(arg4, "")) {
+					AM_ConsolePrint(ent, "No Blank spaces!\n");
+				}
+
+				/*if (ent->client->pers.adminUser->rank <= admin->rank)
+				return;*/
+
+				admin->lock = atoi(arg4);
+				AM_ConsolePrint(ent, va("Lock set to %i\n", atoi(arg4)));
+				AM_SaveAdmins(qtrue);
+			}
+		}
+	}
+	else if (!Q_stricmp(arg2, "force")) 
+	{
+		AM_ConsolePrint(ent, "Usage: \\administrate <ID> <force> ^1<logout>\n");
+
+		int targetClient = (trap->Argc() > 1) ? G_ClientFromString(ent, arg1, FINDCL_SUBSTR | FINDCL_PRINT) : ent - g_entities;
+
+
+		if (targetClient == -1) {
+			return;
+		}
+
+		gentity_t *targ = &g_entities[targetClient];
+		
+		if (!Q_stricmp(arg3, "logout"))
+		{
+			if (targ->client->pers.adminUser) 
+			{
+				
+				if (!AM_CanInflict(ent, targ))
+					return;
+
+				AM_ConsolePrint(ent, va("Logged out %s.\n", targ->client->pers.netnameClean));
+				AM_ConsolePrint(targ, va("^7[^3ADMIN^7] %s ^3logged you out.^7\n", ent->client->pers.netnameClean));
+				targ->client->pers.adminData.isTag = qfalse;
+				targ->client->pers.adminUser = NULL;
+			}
+		}
+	}
+
+	Q_DeletePrintBuffer(&pb);
+}
+
+//Wolf: Zyks mod part, <3 thank you dude, you spared me a lot of work.
+// |
+// v
+
+void SP_fx_runner_S(gentity_t *ent);
+// zyk: clear effects of some special powers
+void clear_special_power_effect(gentity_t *ent)
+{
+	if (level.special_power_effects[ent->s.number] != -1 && level.special_power_effects_timer[ent->s.number] < level.time)
+	{
+		level.special_power_effects[ent->s.number] = -1;
+
+		// zyk: if it is a misc_model_breakable power, remove it right now
+		if (Q_stricmp(ent->classname, "misc_model_breakable") == 0)
+			G_FreeEntity(ent);
+		else
+			ent->think = G_FreeEntity;
+	}
+}
+
+void zyk_lightning_dome_radius_damage(gentity_t *ent)
+{
+	float		frac = (level.time - ent->genericValue5) / 800.0f; // / 1600.0f; // synchronize with demp2 effect
+	float		dist, radius, fact;
+	gentity_t	*gent;
+	int			iEntityList[MAX_GENTITIES];
+	gentity_t	*entityList[MAX_GENTITIES];
+	gentity_t	*myOwner = NULL;
+	int			numListedEntities, i, e;
+	vector3		mins, maxs;
+	vector3		v, dir;
+
+	if (ent->r.ownerNum >= 0 &&
+		ent->r.ownerNum < /*MAX_CLIENTS ... let npc's/shooters use it*/MAX_GENTITIES)
+	{
+		myOwner = &g_entities[ent->r.ownerNum];
+	}
+
+	if (!myOwner || !myOwner->inuse || !myOwner->client)
+	{
+		ent->think = G_FreeEntity;
+		ent->nextthink = level.time;
+		return;
+	}
+
+	frac *= frac * frac; // yes, this is completely ridiculous...but it causes the shell to grow slowly then "explode" at the end
+
+	radius = frac * 100.0f; // 200 is max radius...the model is aprox. 100 units tall...the fx draw code mults. this by 2.
+
+	fact = ent->count*0.6;
+
+	if (fact < 1)
+	{
+		fact = 1;
+	}
+
+	radius *= fact;
+
+
+	mins.x = ent->r.currentOrigin.x - radius;
+	maxs.x = ent->r.currentOrigin.x + radius;
+	mins.y = ent->r.currentOrigin.y - radius;
+	maxs.y = ent->r.currentOrigin.y + radius;
+	mins.z = ent->r.currentOrigin.z - radius;
+	maxs.z = ent->r.currentOrigin.z + radius;
+
+	numListedEntities = trap->EntitiesInBox(&mins, &maxs, iEntityList, MAX_GENTITIES);
+
+	i = 0;
+	while (i < numListedEntities)
+	{
+		entityList[i] = &g_entities[iEntityList[i]];
+		i++;
+	}
+
+	for (e = 0; e < numListedEntities; e++)
+	{
+		gent = entityList[e];
+
+		if (!gent || !gent->takedamage || !gent->r.contents)
+		{
+			continue;
+		}
+
+		// find the distance from the edge of the bounding box
+
+		if (ent->r.currentOrigin.x < gent->r.absmin.x) {
+			v.x = gent->r.absmin.x - ent->r.currentOrigin.x;
+		}
+		else if (ent->r.currentOrigin.x > gent->r.absmax.x)
+		{
+			v.x = ent->r.currentOrigin.x - gent->r.absmax.x;
+		}
+		else
+		{
+			v.x = 0;
+		}
+
+		if (ent->r.currentOrigin.y < gent->r.absmin.y) {
+			v.y = gent->r.absmin.y - ent->r.currentOrigin.y;
+		}
+		else if (ent->r.currentOrigin.y > gent->r.absmax.y)
+		{
+			v.y = ent->r.currentOrigin.y - gent->r.absmax.y;
+		}
+		else
+		{
+			v.y = 0;
+		}
+
+		if (ent->r.currentOrigin.z < gent->r.absmin.z) {
+			v.z = gent->r.absmin.z - ent->r.currentOrigin.z;
+		}
+		else if (ent->r.currentOrigin.z > gent->r.absmax.z)
+		{
+			v.z = ent->r.currentOrigin.z - gent->r.absmax.z;
+		}
+		else
+		{
+			v.z = 0;
+		}
+
+		// shape is an ellipsoid, so cut vertical distance in half`
+		v.z *= 0.5f;
+
+		dist = VectorLength(&v);
+
+		if (dist >= radius)
+		{
+			// shockwave hasn't hit them yet
+			continue;
+		}
+
+		if (dist + (16 * ent->count) < ent->genericValue6)
+		{
+			// shockwave has already hit this thing...
+			continue;
+		}
+
+		VectorCopy(&gent->r.currentOrigin, &v);
+		VectorSubtract(&v, &ent->r.currentOrigin, &dir);
+
+		// push the center of mass higher than the origin so players get knocked into the air more
+		dir.z += 12;
+
+		if (gent != myOwner)
+		{
+			G_Damage(gent, myOwner, myOwner, &dir, &ent->r.currentOrigin, ent->damage, DAMAGE_DEATH_KNOCKBACK, ent->splashMethodOfDeath);
+			if (gent->takedamage
+				&& gent->client)
+			{
+				if (gent->client->ps.electrifyTime < level.time)
+				{//electrocution effect
+					if (gent->s.eType == ET_NPC && gent->s.NPC_class == CLASS_VEHICLE &&
+						gent->m_pVehicle && (gent->m_pVehicle->m_pVehicleInfo->type == VH_SPEEDER || gent->m_pVehicle->m_pVehicleInfo->type == VH_WALKER))
+					{ //do some extra stuff to speeders/walkers
+						gent->client->ps.electrifyTime = level.time + Q_irand(3000, 4000);
+					}
+					else if (gent->s.NPC_class != CLASS_VEHICLE
+						|| (gent->m_pVehicle && gent->m_pVehicle->m_pVehicleInfo->type != VH_FIGHTER))
+					{//don't do this to fighters
+					 // zyk: Universe Power
+							gent->client->ps.electrifyTime = level.time + Q_irand(300, 800);
+					}
+				}
+			}
+		}
+	}
+
+	// store the last fraction so that next time around we can test against those things that fall between that last point and where the current shockwave edge is
+	ent->genericValue6 = radius;
+
+	if (frac < 1.0f)
+	{
+		// shock is still happening so continue letting it expand
+		ent->nextthink = level.time + 50;
+	}
+	else
+	{ //don't just leave the entity around
+		ent->think = G_FreeEntity;
+		ent->nextthink = level.time;
+	}
+}
+
+//---------------------------------------------------------
+void zyk_lightning_dome_detonate(gentity_t *ent)
+//---------------------------------------------------------
+{
+	gentity_t *efEnt;
+
+	G_SetOrigin(ent, &ent->r.currentOrigin);
+	if (!ent->pos1.x && !ent->pos1.y && !ent->pos1.z)
+	{ //don't play effect with a 0'd out directional vector
+		ent->pos1.y = 1;
+	}
+	//Let's just save ourself some bandwidth and play both the effect and sphere spawn in 1 event
+	efEnt = G_PlayEffect(EFFECT_EXPLOSION_DEMP2ALT, &ent->r.currentOrigin, &ent->pos1);
+
+	if (efEnt)
+	{
+		efEnt->s.weapon = ent->count * 2;
+	}
+
+	ent->genericValue5 = level.time;
+	ent->genericValue6 = 0;
+	ent->nextthink = level.time + 50;
+	ent->think = zyk_lightning_dome_radius_damage;
+	ent->s.eType = ET_GENERAL; // make us a missile no longer
+}
+
+void lightning_dome(gentity_t *ent, int damage)
+{
+	gentity_t *missile;
+	vector3 origin;
+	trace_t	tr;
+
+	VectorSet(&origin, ent->client->ps.origin.x, ent->client->ps.origin.y, ent->client->ps.origin.z - 22);
+
+	trap->Trace(&tr, &ent->client->ps.origin, NULL, NULL, &origin, ent->s.number, MASK_SHOT, qfalse, 0, 0);
+
+	missile = G_Spawn();
+
+	G_SetOrigin(missile, &origin);
+	//In SP the impact actually travels as a missile based on the trace fraction, but we're
+	//just going to be instant. -rww
+
+	VectorCopy(&tr.plane.normal, &missile->pos1);
+
+	missile->count = 9;
+
+	missile->classname = "demp2_alt_proj";
+	missile->s.weapon = WP_DEMP2;
+
+	missile->think = zyk_lightning_dome_detonate;
+	missile->nextthink = level.time;
+
+	missile->splashDamage = missile->damage = damage;
+	missile->splashMethodOfDeath = missile->methodOfDeath = MOD_DEMP2;
+	missile->splashRadius = 32;
+
+	missile->r.ownerNum = ent->s.number;
+
+	missile->dflags = DAMAGE_DEATH_KNOCKBACK;
+	missile->clipmask = MASK_SHOT | CONTENTS_LIGHTSABER;
+
+	// we don't want it to ever bounce
+	missile->bounceCount = 0;
+
+	if (ent->s.number < level.maxclients)
+		G_Sound(ent, CHAN_AUTO, G_SoundIndex("sound/ambience/thunder_close1.mp3"));
+}
+
+static void AM_Discharge( gentity_t *ent ) {
+	lightning_dome( ent, Q_irand( 40, 60 ));
+}
+
+void Lightning(gentity_t *ent, int damage) {
+	gentity_t *lightning = G_Spawn(),
+			  *explosion = G_Spawn();
+	trace_t *tr;
+	const char *fxFile = "env/huge_lightning";
+	const char *fxFile2 = "explosions/explosion1";
+
+	tr = G_RealTrace(ent, 0);
+	
+	lightning->fullName = fxFile;
+	lightning->speed = 0;
+	lightning->special = 1;
+	VectorCopy(&tr->endpos, &lightning->s.origin);
+
+	SP_fx_runner_S(lightning);
+
+	level.special_power_effects[lightning->s.number] = ent->s.number;
+	level.special_power_effects_timer[lightning->s.number] = level.time + 500;
+
+	explosion->fullName = fxFile2;
+	explosion->speed = 0;
+	explosion->special = 1;
+	VectorCopy(&tr->endpos, &explosion->s.origin);
+
+	SP_fx_runner_S(explosion);
+
+	level.special_power_effects[explosion->s.number] = ent->s.number;
+	level.special_power_effects_timer[explosion->s.number] = level.time + 500;
+
+	G_SoundEntityT(lightning, CHAN_AUTO, G_SoundIndex( "sound/ambience/thunder1"), 0);
+	G_SetAnim(ent, NULL, SETANIM_TORSO, BOTH_FORCELIGHTNING, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS, 0);
+	G_RadiusDamage(&tr->endpos, ent, 100, 256, ent, NULL, MOD_DET_PACK_SPLASH);
+}
+
+static void AM_Lightning( gentity_t *ent ) {
+	Lightning( ent, 500 );
+}
+
+void ExplosionOP(gentity_t *ent) {
+	gentity_t *beam		 = G_Spawn(),
+			  *explosion = G_Spawn();
+	trace_t *tr;
+	const char *fxFile = "env/hevil_bolt";
+	const char *fxFile2 = "explosions/wedge_explosion1";
+
+	beam->fullName = fxFile;
+	beam->s.origin = ent->r.currentOrigin;
+	beam->s.origin.z = ent->r.currentOrigin.z + 40.0f;
+	beam->speed = 0;
+	beam->special = 1;
+	G_SetAngles(beam, &ent->client->ps.viewangles);
+
+	SP_fx_runner_S(beam);
+
+	level.special_power_effects[beam->s.number] = ent->s.number;
+	level.special_power_effects_timer[beam->s.number] = level.time + 500;
+	G_SoundEntityT(beam, CHAN_AUTO, G_SoundIndex("sound/effects/thud"), 0);
+
+	tr = G_RealTrace(ent, 0);
+
+	explosion->fullName = fxFile2;
+	explosion->speed = 0;
+	explosion->special = 1;
+	VectorCopy(&tr->endpos, &explosion->s.origin);
+
+	SP_fx_runner_S(explosion);
+
+	level.special_power_effects[explosion->s.number] = ent->s.number;
+	level.special_power_effects_timer[explosion->s.number] = level.time + 500;
+
+	G_SetAnim(ent, NULL, SETANIM_TORSO, BOTH_FORCE_DRAIN_START, SETANIM_FLAG_OVERRIDE | SETANIM_FLAG_HOLD | SETANIM_FLAG_HOLDLESS, 0);
+	G_RadiusDamage(&tr->endpos, ent, 10000, 786, ent, NULL, MOD_DET_PACK_SPLASH);
+}
+
+static void AM_BlowUp( gentity_t *ent ) {
+	ExplosionOP( ent );
+}
+
+void Use_Beam( gentity_t *ent )  {
+	gentity_t *beam = G_Spawn();
+	const char *fxFile = "env/hevil_bolt";
+
+	beam->fullName = fxFile;
+	beam->s.origin = ent->r.currentOrigin;
+	beam->s.origin.z = ent->r.currentOrigin.z + 40.0f;
+	beam->speed = 0;
+	beam->special = 1;
+	G_SetAngles(beam, &ent->client->ps.viewangles);
+
+	SP_fx_runner_S(beam);
+	
+	level.special_power_effects[beam->s.number] = ent->s.number;
+	level.special_power_effects_timer[beam->s.number] = level.time + 500;
+	//G_SoundEntityT(beam, CHAN_AUTO, G_SoundIndex("sound/effects/thud"), 0);
+}
+
+static void AM_Use(gentity_t *ent) {
+
+	if (!ent) {
+		return;
+	}
+
+	trace_t *tr = G_RealTrace(ent, 0.0f);
+	if (tr->fraction < 1.0f && tr->entityNum > MAX_CLIENTS && tr->entityNum < ENTITYNUM_MAX_NORMAL) {
+		gentity_t *targ = g_entities + tr->entityNum;
+
+		if (targ->use)
+		{
+			targ->use(targ, ent, ent);
+			Use_Beam(ent);
+		}
+	}
+}
+
+
+void W_TraceSetStart(gentity_t *ent, vector3 *start, vector3 *mins, vector3 *maxs);
+void touch_NULL(gentity_t *ent, gentity_t *other, trace_t *trace);
+
+void BallThink(gentity_t *ent) {
+	G_RunObject(ent);
+	ent->nextthink = level.time;
+}
+
+//--Ball Physics--
+
+static void AM_SpawnBall(gentity_t *ent) {
+	gentity_t	*bolt;
+	vector3		dir, start, forward, muzzle;
+	float chargeAmount = 1.0f; // default of full charge
+
+	VectorCopy(&ent->r.currentAngles, &dir);
+	VectorCopy(&ent->r.currentOrigin, &start);
+
+	bolt = G_Spawn();
+
+	bolt->physicsObject = qtrue;
+
+	bolt->classname = "misc_model_breakable";
+	bolt->model = "models/weapons2/thermal/thermal.md3";
+	bolt->think = BallThink;
+	bolt->nextthink = level.time;
+	bolt->touch = touch_NULL;
+	
+	// How 'bout we give this thing a size...
+	VectorSet(&bolt->r.mins, -9.0f, -9.0f, -9.0f);
+	VectorSet(&bolt->r.maxs, 9.0f, 9.0f, 9.0f);
+	bolt->s.iModelScale = 300;
+	VectorSet(&bolt->modelScale, 300.0f, 300.0f, 300.0f);
+	bolt->clipmask = MASK_SHOT;
+
+	W_TraceSetStart(ent, &start, &bolt->r.mins, &bolt->r.maxs);//make sure our start point isn't on the other side of a wall
+
+	// normal ones bounce, alt ones explode on impact
+	//bolt->genericValue5 = level.time + 60000; // How long 'til she blows
+	bolt->s.pos.trType = TR_GRAVITY;
+	bolt->parent = ent;
+	bolt->r.ownerNum = ent->s.number;
+	VectorScale(&dir, 300 * 0.15f, &bolt->s.pos.trDelta);
+
+	if (ent->health >= 0) {
+		bolt->s.pos.trDelta.z += 120;
+	}
+
+	bolt->flags |= FL_BOUNCE;
+	
+	bolt->s.loopSound = G_SoundIndex("sound/weapons/thermal/thermloop.wav");
+	bolt->s.loopIsSoundset = qfalse;
+
+	//bolt->damage = NULL;
+	bolt->dflags = 0;
+	//bolt->splashDamage = NULL;
+	//bolt->splashRadius = NULL;
+
+	bolt->s.eType = ET_MISSILE;
+	bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
+	bolt->s.weapon = WP_THERMAL;
+
+	bolt->methodOfDeath = MOD_THERMAL;
+	bolt->splashMethodOfDeath = MOD_THERMAL_SPLASH;
+
+	bolt->s.pos.trTime = level.time;		// move a bit on the very first frame
+	VectorCopy(&start, &bolt->s.pos.trBase);
+
+	VectorSnap(&bolt->s.pos.trDelta);			// save net bandwidth
+	VectorCopy(&start, &bolt->r.currentOrigin);
+
+	VectorCopy(&start, &bolt->pos2);
+
+	bolt->bounceCount = -5;
+}
+
 
 typedef struct adminCommand_s {
 	const char *cmd;
-	uint64_t privilege;		//Since we've got 64 bitfields we want to use them, right?
+	uint64_t privilege;
 	void( *func )(gentity_t *ent);
 } adminCommand_t;
 
 static const adminCommand_t adminCommands[] = {
 	// these must be in alphabetical order for the binary search to work
 	//	{ "amlogin", -1, AM_Login }, // log in using user + pass (handled explicitly!!!)
+	{ "administrate", PRIV_EDIT, AM_Administrate }, // Manage accounts
+	{ "amanim", PRIV_ANIM, AM_Anim }, // Play Custom Animations
 	{ "amban", PRIV_BAN, AM_Ban }, // ban specified client (client + duration + reason)
 	{ "ambanip", PRIV_BAN, AM_BanIP }, // ban specified IP (IP/range-ban + duration + reason)
+	{ "ambanlist", PRIV_BAN, AM_BanList }, // show ban list
+	{ "amblowup", PRIV_POWERS, AM_BlowUp }, // Blow up 
 	{ "amclip", PRIV_CLIP, AM_Clip }, // toggle noclip mode
+	{ "amDEV", PRIV_DEV, AM_DEV }, // Developer
+	{ "amdischarge", PRIV_POWERS, AM_Discharge },
 	{ "amempower", PRIV_EMPOWER, AM_Empower }, // empower the specified client
 	{ "amentlist", PRIV_ENTSPAWN, AM_EntList }, // lists all spawned entities
 	{ "amentremove", PRIV_ENTSPAWN, AM_EntRemove }, // remove an entity
 	{ "amentspawn", PRIV_ENTSPAWN, AM_EntSpawn }, // spawn an entity
 	{ "amforceteam", PRIV_FORCETEAM, AM_ForceTeam }, // force the specified client to a specific team
-	{ "amfreeze", PRIV_SLEEP, AM_Freeze }, // !DEPRECATED! freeze specified client on the spot
 	{ "amghost", PRIV_GHOST, AM_Ghost }, // ghost specified client (or self)
 	{ "amgive", PRIV_GIVE, AM_Give }, // give weapon/force/ammo to player
+	{ "amgod", PRIV_GOD, AM_God }, // God Yourself
 	{ "amgrant", PRIV_GRANT, AM_Grant }, // Grant admin permission to player...
+	{ "amgravity", PRIV_GRAVITY, AM_Gravity }, // set Clients Gravity
+	{ "amicon", PRIV_ICON, AM_Icon }, // adminicon
 	{ "amkick", PRIV_KICK, AM_Kick }, // kick specified client
 	{ "amkillvote", PRIV_KILLVOTE, AM_KillVote }, // kill the current vote
+	{ "amlightning", PRIV_POWERS, AM_Lightning }, // Lightning
 	{ "amlisttele", PRIV_TELEPORT, AM_ListTelemarks }, // list all marked positions
 	{ "amlockteam", PRIV_LOCKTEAM, AM_LockTeam }, // prevent clients from joining a team
 	{ "amlogout", 0xFFFFFFFFu, AM_Logout }, // logout
 	{ "amluaexec", PRIV_LUA, AM_Lua }, // execute Lua code
 	{ "amluareload", PRIV_LUA, AM_ReloadLua }, // reload JPLua system
 	{ "ammap", PRIV_MAP, AM_Map }, // change map and gamemode
+	{ "ammap_restart", PRIV_MAP, AM_Map_Restart }, // maprestart
 	{ "ammerc", PRIV_MERC, AM_Merc }, // give all weapons
-	{ "ammindtrick", PRIV_MINDTRICK, AM_MindTrick }, // mindtrick client
+	{ "ammonk", PRIV_MONK, AM_Monk }, // monk client
 	{ "amnotarget", PRIV_NOTARGET, AM_NoTarget }, // toggle notarget mode
 	{ "amnpc", PRIV_NPCSPAWN, AM_NPCSpawn }, // spawn an NPC (including vehicles)
 	{ "ampoll", PRIV_POLL, AM_Poll }, // call an arbitrary vote
@@ -3492,23 +5172,29 @@ static const adminCommand_t adminCommands[] = {
 	{ "amremap", PRIV_REMAP, AM_Remap }, // shader remapping
 	{ "amremovetele", PRIV_TELEPORT, AM_RemoveTelemark }, // remove a telemark from the list
 	{ "amrename", PRIV_RENAME, AM_Rename }, // rename a client
+	{ "amsaberextra", PRIV_SABER, AM_SaberExtras }, // Tavion + Desann Style added
 	{ "amsavetele", PRIV_TELEPORT, AM_SaveTelemarksCmd }, // save marked positions RAZFIXME: temporary?
+	{ "amscale", PRIV_SCALE, AM_Scale }, // Scale yourself
 	{ "amseetele", PRIV_TELEPORT, AM_SeeTelemarks }, // visualise all telemarks
 	{ "amsilence", PRIV_SILENCE, AM_Silence }, // silence specified client
 	{ "amslap", PRIV_SLAP, AM_Slap }, // slap the specified client
 	{ "amslay", PRIV_SLAY, AM_Slay }, // slay the specified client
 	{ "amsleep", PRIV_SLEEP, AM_Sleep }, // sleep the specified client
+	{ "amsound", PRIV_SOUND, AM_Sound }, // Play a sound
+	{ "amspeed", PRIV_SPEED, AM_Speed }, // set the speed of the client
 	{ "amstatus", PRIV_STATUS, AM_Status }, // display list of players + clientNum + IP + admin
 	{ "amtele", PRIV_TELEPORT, AM_Teleport }, // teleport (all variations of x to y)
 	{ "amtelemark", PRIV_TELEPORT, AM_Telemark }, // mark current location
+	{ "amunban", PRIV_BAN, AM_Unban }, // Unban by IP
 	{ "amungrant", PRIV_GRANT, AM_UnGrant }, // bye
 	{ "amunlockteam", PRIV_LOCKTEAM, AM_UnlockTeam }, // allow clients to join a team
 	{ "amunsilence", PRIV_SILENCE, AM_Unsilence }, // unsilence specified client
+	{ "amuse", PRIV_ENTSPAWN, AM_Use }, // Use an g_entity
 	{ "amvstr", PRIV_VSTR, AM_Vstr }, // execute a variable string
 	{ "amwake", PRIV_SLEEP, AM_Wake }, // wake the specified client
+	{ "amwatch", PRIV_WATCH, AM_Watch }, // Read between lines
 	{ "amweather", PRIV_WEATHER, AM_Weather }, // weather effects
 	{ "amwhois", PRIV_WHOIS, AM_WhoIs }, // display list of admins
-	{ "gunfreeze", PRIV_SLEEP, AM_GunFreeze }, // DEPRECATED: toggle the 'frozen' state of targeted client
 	{ "gunprotect", PRIV_PROTECT, AM_GunProtect }, // protect the targeted client
 	{ "gunslap", PRIV_SLAP, AM_GunSlap }, // slap the targeted client
 	{ "gunsleep", PRIV_SLEEP, AM_GunSleep }, // sleep/wake the targeted client
@@ -3517,8 +5203,81 @@ static const adminCommand_t adminCommands[] = {
 	{ "guntelemark", PRIV_TELEPORT, AM_GunTeleportMark }, // mark targeted location
 	{ "guntelerev", PRIV_TELEPORT, AM_GunTeleportRev }, // teleport targeted client to self
 	{ "gunwake", PRIV_SLEEP, AM_GunSleep }, // sleep/wake the targeted client
+	{ "Z_ball", PRIV_DEBUG, AM_SpawnBall }, // Ball Physics (Development paused yet)
 };
 static const size_t numAdminCommands = ARRAY_LEN( adminCommands );
+
+void PrintPrivs( gentity_t *ent, char *targ, printBufferSession_t *pb ) {
+	adminUser_t *admin = NULL;
+	const adminCommand_t *command = NULL;
+	unsigned int count = 0;
+	const unsigned int limit = 102;
+	size_t i;
+
+	for (admin = adminUsers; admin; admin = admin->next) {
+		if (!strcmp(targ, admin->user)) {
+			break;
+		}
+	}
+
+	if (!admin) {
+		//AM_ConsolePrint(ent, va("%s is a non-existent account.\n", targ));
+		return;
+	}
+
+	for (i = 0, command = adminCommands; i < numAdminCommands; i++, command++)
+	{
+		if (i < 10)
+		{
+			const char *tmpMsg = va("" S_COLOR_RED "0%d ^%c%-13s %-14s", i, COLOR_WHITE, command->cmd, admin->privileges & command->privilege ? "[^2o^7]" : "[^1x^7]");
+
+			if (count >= limit) {
+				tmpMsg = va("   \n %-14s", tmpMsg);
+				count = 0;
+			}
+
+			count += strlen(tmpMsg);
+			
+			Q_PrintBuffer(pb, tmpMsg);
+		}
+		else
+		{
+			const char *tmpMsg = va("" S_COLOR_RED "%d ^%c%-13s %-14s", i, COLOR_WHITE, command->cmd, admin->privileges & command->privilege ? "[^2o^7]" : "[^1x^7]");
+
+			//newline if we reach limit
+			if (count >= limit) {
+				tmpMsg = va("   \n %-14s", tmpMsg);
+				count = 0;
+			}
+
+			count += strlen(tmpMsg);
+			Q_PrintBuffer(pb, tmpMsg);
+		}
+	}
+}
+
+void PrintData( gentity_t *ent ,char *targ, printBufferSession_t *pb ) {
+	adminUser_t *admin = NULL;
+
+	for (admin = adminUsers; admin; admin = admin->next) {
+		if (!strcmp(targ, admin->user)) {
+			break;
+		}
+	}
+
+	if (!admin) {
+		//AM_ConsolePrint(ent, va("%s is a non-existent account.\n", targ));
+		return;
+	}
+
+	Q_PrintBuffer(pb, "^3==============^7PROFILE^3==============^7\n");
+	Q_PrintBuffer(pb, va("^5Username^7:%-16s%s\n", "", admin->user));
+	Q_PrintBuffer(pb, va("^5Rank^7:%-20s%s^7\n", "", admin->rank < ADMIN_MAX ? adminRanks[admin->rank].c_str() : ""));
+	Q_PrintBuffer(pb, va("^5E-Mail^7:%-18s%s\n", "", admin->eMail));
+	Q_PrintBuffer(pb, va("^5Screensize^7:%-14s%s\n", "", admin->isScreenS > 0 ? "^2On^7" : "^1Off^7"));
+	Q_PrintBuffer(pb, va("^5Customtag^7:%-15s%s\n", "", admin->isCustomRank > 0 ? "^2On^7" : "^1Off^7"));
+	Q_PrintBuffer(pb, "^3===================================^7\n");
+}
 
 static int cmdcmp( const void *a, const void *b ) {
 	return Q_stricmp( (const char *)a, ((adminCommand_t*)b)->cmd );
@@ -3532,7 +5291,7 @@ static uint64_t GetPrivileges( const gentity_t *ent ) {
 qboolean AM_HasPrivilege( const gentity_t *ent, uint64_t privilege ) {
 	adminUser_t *user = ent->client->pers.adminUser;
 
-	if ( user && (user->privileges & privilege) ) {
+	if ( (user && (user->privileges & privilege)) ) {
 		return qtrue;
 	}
 	else if (ent->client->pers.tempprivs != 0 && (ent->client->pers.tempprivs & privilege)){
@@ -3547,8 +5306,10 @@ qboolean AM_HasPrivilege( const gentity_t *ent, uint64_t privilege ) {
 // return false if command didn't exist, so we can tell them.
 qboolean AM_HandleCommands( gentity_t *ent, const char *cmd ) {
 	adminCommand_t *command = NULL;
+	gentity_t *e;
+	int i;
 
-	if ( ent == nullptr ) { // call from console
+	if (ent == nullptr) { // call from console
 		command = (adminCommand_t *)bsearch(cmd, adminCommands, numAdminCommands, sizeof(adminCommands[0]), cmdcmp);
 		if (command) {
 			command->func(nullptr);
@@ -3556,8 +5317,21 @@ qboolean AM_HandleCommands( gentity_t *ent, const char *cmd ) {
 		}
 	}
 
-	else if ( !Q_stricmp( cmd, "amlogin" ) ) {
+
+	if ( !Q_stricmp( cmd, "amlogin" ) ) {
 		AM_Login( ent );
+		return qtrue;
+	}
+
+	//The JK1 ForceChargeJump, pretty dank.
+	if (!Q_stricmp(cmd, "amjump") && ent->client->pers.adminUser && ent->client->pers.adminUser->rank > 6 ) {
+		AM_Jump( ent );
+		return qtrue;
+	}
+	
+	//Add yourself a Tag.
+	if (!Q_stricmp(cmd, "amtag") && ent->client->pers.adminUser ) {
+		AM_Tag( ent );
 		return qtrue;
 	}
 
@@ -3568,14 +5342,25 @@ qboolean AM_HandleCommands( gentity_t *ent, const char *cmd ) {
 
 	else if ( !AM_HasPrivilege( ent, command->privilege ) ) {
 		trap->SendServerCommand( ent - g_entities, "print \"Insufficient privileges\n\"" );
-		G_LogPrintf( level.log.admin, "[FAILED-EXECUTE] %s (%" PRId64 " & %" PRId64 "), %s\n", cmd, GetPrivileges( ent ),
-			command->privilege, G_PrintClient( ent-g_entities ) );
+		G_LogPrintf(level.log.admin, "[FAILED-EXECUTE] %s (%" PRId64 " & %" PRId64 "), %s\n", cmd, GetPrivileges(ent),
+			command->privilege, G_PrintClient(ent - g_entities));
+
+		for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+			if (e->client->pers.adminData.isDev) {
+				trap->SendServerCommand(e - g_entities, va("print \"[FAILED-EXECUTE] %s (%" PRId64 " & %" PRId64 "), %s\n\"", cmd, GetPrivileges(ent),
+					command->privilege, G_PrintClient(ent - g_entities)));
+			}
+		}
 		return qtrue;
 	}
 
+	for (i = 0, e = g_entities; i < level.maxclients; i++, e++) {
+		if (e->client->pers.adminData.isDev) {
+			trap->SendServerCommand(e - g_entities, va("print \"[EXECUTE] %s, %s\n\"", cmd, G_PrintClient(ent - g_entities)));
+		}
+	}
 	G_LogPrintf( level.log.admin, "[EXECUTE] %s, %s\n", cmd, G_PrintClient( ent-g_entities ) );
 	command->func( ent );
-
 	return qtrue;
 }
 
@@ -3584,28 +5369,110 @@ void AM_PrintCommands( gentity_t *ent, printBufferSession_t *pb ) {
 	adminUser_t *user = ent->client->pers.adminUser;
 	int toggle = 0;
 	unsigned int count = 0;
-	const unsigned int limit = 72;
+	const unsigned int limit = 102;
 	size_t i;
 
-	Q_PrintBuffer( pb, "Admin commands:\n   " );
+	Q_PrintBuffer( pb, "Admin commands:\n " );
 
-	if ( !user ) {
+	if ( !user && ent->client->pers.tempprivs == 0 ) {
 		Q_PrintBuffer( pb, " " S_COLOR_RED "Unavailable " S_COLOR_WHITE "\n\n" );
 		return;
 	}
 
-	for ( i = 0, command = adminCommands; i < numAdminCommands; i++, command++ ) {
+	for (i = 0, command = adminCommands; i < numAdminCommands; i++, command++) {
 		if ( AM_HasPrivilege( ent, command->privilege ) ) {
-			const char *tmpMsg = va( " ^%c%s", (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd );
 
-			//newline if we reach limit
-			if ( count >= limit ) {
-				tmpMsg = va( "\n   %s", tmpMsg );
-				count = 0;
+			if (ent->client->pers.adminUser) 
+			{
+				if (ent->client->pers.adminUser->isScreenS < 1) {
+					if (i < 10)
+					{
+						const char *tmpMsg = va("" S_COLOR_RED "0%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+						if (count >= limit) {
+							tmpMsg = va("   \n %-18s", tmpMsg);
+							count = 0;
+						}
+
+						count += strlen(tmpMsg);
+						Q_PrintBuffer(pb, tmpMsg);
+					}
+					else
+					{
+						const char *tmpMsg = va("" S_COLOR_RED "%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+						//newline if we reach limit
+						if (count >= limit) {
+							tmpMsg = va("   \n %-18s", tmpMsg);
+							count = 0;
+						}
+
+						count += strlen(tmpMsg);
+						Q_PrintBuffer(pb, tmpMsg);
+					}
+
+				}
+				else
+				{
+					const unsigned int limit = 92;
+
+					if (i < 10)
+					{
+						const char *tmpMsg = va("" S_COLOR_RED "0%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+						if (count >= limit) {
+							tmpMsg = va("   \n %-18s", tmpMsg);
+							count = 0;
+						}
+
+						count += strlen(tmpMsg);
+						Q_PrintBuffer(pb, tmpMsg);
+					}
+					else
+					{
+						const char *tmpMsg = va("" S_COLOR_RED "%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+						//newline if we reach limit
+						if (count >= limit) {
+							tmpMsg = va("   \n %-18s", tmpMsg);
+							count = 0;
+						}
+
+						count += strlen(tmpMsg);
+						Q_PrintBuffer(pb, tmpMsg);
+					}
+				}
+
 			}
 
-			count += strlen( tmpMsg );
-			Q_PrintBuffer( pb, tmpMsg );
+			if (ent->client->pers.tempprivs > 0) 
+			{
+				if (i < 10)
+				{
+					const char *tmpMsg = va("" S_COLOR_RED "0%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+					if (count >= limit) {
+						tmpMsg = va("   \n %-18s", tmpMsg);
+						count = 0;
+					}
+
+					count += strlen(tmpMsg);
+					Q_PrintBuffer(pb, tmpMsg);
+				}
+				else
+				{
+					const char *tmpMsg = va("" S_COLOR_RED "%d ^%c%-16s", i, (++toggle & 1 ? COLOR_GREEN : COLOR_YELLOW), command->cmd);
+
+					//newline if we reach limit
+					if (count >= limit) {
+						tmpMsg = va("   \n %-18s", tmpMsg);
+						count = 0;
+					}
+
+					count += strlen(tmpMsg);
+					Q_PrintBuffer(pb, tmpMsg);
+				}
+			}
 		}
 	}
 
@@ -3614,13 +5481,40 @@ void AM_PrintCommands( gentity_t *ent, printBufferSession_t *pb ) {
 
 void AM_ApplySessionTransition( gentity_t *ent ) {
 	const adminData_t *data = &ent->client->pers.adminData;
+	
 	if ( data->empowered ) {
 		Empower_On( ent );
 	}
+
 	if ( data->merc ) {
 		Merc_On( ent );
 	}
+
+	if ( data->isGod ) {
+		God_On( ent );
+	}
+
 	if ( data->isSlept ) {
 		G_SleepClient( ent->client );
+	}
+
+	if ( data->hasExtraStyles ) {
+		Saber_On( ent );
+	}
+
+	if ( data->isMonked ) {
+		Monk_On( ent );
+	}
+
+	if ( data->isDev ) {
+		ent->client->pers.adminData.isDev = qtrue;
+	}
+
+	if ( data->isListening ) {
+		ent->client->pers.adminData.isListening = qtrue;
+	}
+
+	if ( data->isListeningC ) {
+		ent->client->pers.adminData.isListeningC = qtrue;
 	}
 }

@@ -212,6 +212,7 @@ typedef enum sayTeamMethod_e {
 	STM_TEAM = 0,
 	STM_ADMIN,
 	STM_CENTERPRINT,
+	STM_CLAN,
 	STM_NUM_METHODS
 } sayTeamMethod_t;
 
@@ -290,6 +291,7 @@ struct gentity_s {
 	int					failedWaypointCheckTime;
 	int					next_roff_time;
 	// DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER EXPECTS THE FIELDS IN THAT ORDER!
+	int					special;
 
 	struct gclient_s	*client;			// NULL if not a client
 	gNPC_t				*NPC;//Only allocated if the entity becomes an NPC
@@ -459,7 +461,6 @@ typedef struct clientSession_s {
 	int					duelTeam;
 	int					siegeDesiredTeam;
 	char				IP[NET_ADDRSTRMAXLEN];
-	char				geoipData[128];
 } clientSession_t;
 
 typedef struct clientPersistant_s {
@@ -476,7 +477,7 @@ typedef struct clientPersistant_s {
 	qboolean			teamInfo; // send team overlay updates?
 	adminUser_t			*adminUser;
 	adminData_t			adminData;
-	uint32_t            tempprivs;
+	uint64_t            tempprivs;
 	qboolean			ready;
 	int					vote; // 0 = none, 1 = yes, 2 = no
 	int					connectTime;
@@ -488,6 +489,8 @@ typedef struct clientPersistant_s {
 	uint32_t			ignore;
 	int					speed;
 	sayTeamMethod_t		sayTeamMethod;
+	qboolean			jetpack;  //Workaround for Caelums server
+	char				clanpass[64];
 } clientPersistant_t;
 
 typedef struct clientTrail_s {
@@ -547,6 +550,7 @@ struct gclient_s {
 	int					bodyGrabIndex;
 	int					pushEffectTime;
 	int					invulnerableTimer;
+	qboolean			invulnerableSpecial; // for Pokemon shields kek
 	int					saberCycleQueue;
 	int					legsAnimExecute;
 	int					torsoAnimExecute;
@@ -760,7 +764,7 @@ typedef struct level_locals_s {
 	std::vector<gentity_t *>	reservedEnts;
 
 	struct {
-		fileHandle_t		admin, console, security;
+		fileHandle_t		admin, console, security, chat;
 	} log;
 
 	struct {
@@ -777,6 +781,13 @@ typedef struct level_locals_s {
 		int					num;
 		char				*infos[MAX_ARENAS];
 	} arenas;
+
+	// zyk: each index has the effect id. The value is the owner of the effect used in Special Powers
+	int special_power_effects[ENTITYNUM_MAX_NORMAL];
+
+	// zyk: timer to remove each effect used in Special Powers
+	int special_power_effects_timer[ENTITYNUM_MAX_NORMAL];
+
 } level_locals_t;
 
 typedef struct refTag_s {
@@ -997,6 +1008,8 @@ void			G_ShowGameMem( void );
 void			G_SiegeClientExData( gentity_t *msgTarg );
 void			G_Sound( gentity_t *ent, int channel, int soundIndex );
 void			G_SoundAtLoc( vector3 *loc, int channel, int soundIndex );
+void			G_SoundEntityE(gentity_t *ent, int channel, int soundIndex);
+void			G_SoundEntityT(gentity_t *ent, int channel, int soundIndex, int starttime);
 int				G_SoundIndex( const char *name );
 void			G_SoundOnEnt( gentity_t *ent, soundChannel_t channel, const char *soundPath );
 int				G_SoundSetIndex( const char *name );
@@ -1023,6 +1036,7 @@ void			G_WriteClientSessionData( const gclient_t *client );
 void			G_WriteSessionData( void );
 void			GetAnglesForDirection( const vector3 *p1, const vector3 *p2, vector3 *out );
 void			GlobalUse( gentity_t *self, gentity_t *other, gentity_t *activator );
+qboolean		HasSetSaberOnly( void );
 void			ItemUse_Binoculars( gentity_t *ent );
 void			ItemUse_Jetpack( gentity_t *ent );
 void			ItemUse_MedPack( gentity_t *ent );
@@ -1149,27 +1163,3 @@ extern const char		*clientPluginDisableNames[];
 extern gameImport_t		*trap;
 
 extern const stringID_table_t TeamTable[];
-
-//GeoIP things
-
-class GeoIPData {
-private:
-	int status = 0;
-	std::string ip = "";
-	std::string data = "";
-	bool ready = false;
-public:
-	GeoIPData(const std::string ip) : ip(ip) {};
-	~GeoIPData() {};
-	bool isReady() { return ready; };
-	std::string* getData() { return &data; };
-	std::string& getIp() { return ip; };
-	int getStatus() { return this->status; };
-	void setStatus(int value) { this->status = value; this->ready = true; };
-};
-
-namespace GeoIP {
-	bool Init(void);
-	void ShutDown(void);
-	GeoIPData *GetIPInfo(const std::string ip);
-}

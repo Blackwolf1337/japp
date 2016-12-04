@@ -6,7 +6,7 @@ extern "C" {
 	#include "maxmind/maxminddb.h"
 }
 namespace GeoIP {
-	static MMDB_s *handle = nullptr;
+	static MMDB_s *handle;
 
 #ifdef _WIN32
 	// temporary files - store them in a circular buffer.
@@ -17,7 +17,7 @@ namespace GeoIP {
 
 	// caller must free() tempFilePath is return value is true
 	// extension is only used on linux and mac but should be in the form ".dat"
-	static bool WriteToTemporaryFile( const void *data, size_t dataLength, char **tempFilePath, const char *extension ) {
+	bool WriteToTemporaryFile( const void *data, size_t dataLength, char **tempFilePath, const char *extension ) {
 	#if defined(_WIN32)
 		DWORD error;
 		TCHAR tempPath[MAX_PATH];
@@ -145,9 +145,6 @@ namespace GeoIP {
 	}
 
 	bool Init( void ) {
-		if ( !japp_detectCountry.integer ) {
-			return false;
-		}
 		if ( handle ) {
 			return true;
 		}
@@ -212,14 +209,12 @@ namespace GeoIP {
 	}
 
 	void ShutDown( void ) {
-		if ( handle ) {
-			MMDB_close( handle );
-			delete handle;
-			handle = nullptr;
-		}
+		MMDB_close( handle );
+		delete handle;
+		handle = nullptr;
 	}
 
-	static void Worker( GeoIPData *data ) {
+	void Worker( GeoIPData *data ) {
 		int error = -1, gai_error = -1;
 		MMDB_lookup_result_s result =  MMDB_lookup_string( handle, data->getIp().c_str(), &gai_error, &error );
 		if ( error != MMDB_SUCCESS || gai_error != 0 ) {
@@ -257,9 +252,6 @@ namespace GeoIP {
 	}
 
 	GeoIPData *GetIPInfo( const std::string ip ) {
-		if ( !japp_detectCountry.integer ) {
-			return nullptr;
-		}
 		if ( handle ) {
 			GeoIPData *data = new GeoIPData( ip );
 			std::future<void> result = std::async( Worker, data );

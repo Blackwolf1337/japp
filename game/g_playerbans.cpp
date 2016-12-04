@@ -423,6 +423,39 @@ void JP_Bans_List( void ) {
 	}
 }
 
+void JP_Bans_List_c( gentity_t *ent ) {
+	banentry_t *entry;
+	int numBans = 0;
+
+	//TODO: table header
+
+	for (entry = banlist; entry; entry = entry->next) {
+		char buf[MAX_STRING_CHARS] = { 0 };
+		char tmp[16] = { 0 };
+		int i = 0;
+
+		Q_strcat(buf, sizeof(buf), va(" #%03d ", ++numBans));
+
+		// build IP
+		if (entry->mask & 1)	Q_strcat(tmp, sizeof(tmp), "*");
+		else					Q_strcat(tmp, sizeof(tmp), va("%i", entry->ip.b[0]));
+		for (i = 1; i < 4; i++) {
+			if (entry->mask & (1 << i))	Q_strcat(tmp, sizeof(tmp), ".*");
+			else							Q_strcat(tmp, sizeof(tmp), va(".%i", entry->ip.b[i]));
+		}
+		Q_strcat(buf, sizeof(buf), va("%-20s ", tmp));
+		tmp[0] = '\0';
+
+		// expire time
+		Q_strcat(buf, sizeof(buf), va("%-20s ", GetRemainingTime(entry->expireTime)));
+
+		// reason
+		Q_strcat(buf, sizeof(buf), entry->banreason);
+
+		trap->SendServerCommand(ent - g_entities, va("print \"%s\n\"", buf));
+	}
+}
+
 qboolean JP_Bans_Remove( byte *ip ) {
 	banentry_t	*entry;
 	banentry_t	*prev = NULL;

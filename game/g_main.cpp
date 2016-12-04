@@ -470,17 +470,18 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	char		cs[MAX_INFO_STRING] = { 0 };
 	vmCvar_t	japp_crashHandler;
 
+
 	trap->Cvar_Register( &japp_crashHandler, "japp_crashHandler", "1", CVAR_ARCHIVE );
 
 	if ( japp_crashHandler.integer ) {
 		ActivateCrashHandler();
 	}
-
+	
 	//Init RMG to 0, it will be autoset to 1 if there is terrain on the level.
 	trap->Cvar_Set( "RMG", "0" );
 	RMG.integer = 0;
 
-	//Clean up any client-server ghoul2 instance attachments that may still exist exe-side
+	//Clean up any client-server ghoul2q instance attachments that may still exist exe-side
 	trap->G2API_CleanEntAttachments();
 
 	BG_InitAnimsets(); //clear it out
@@ -514,6 +515,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	else							trap->Print( "Not logging security events to disk.\n" );
 	if ( g_logAdmin.integer )		G_OpenLog( LOG_DIRECTORY "admin.log", &level.log.admin, g_logAdmin.integer == 2 );
 	else							trap->Print( "Not logging admin events to disk.\n" );
+	if ( g_logChat.integer)			G_OpenLog(LOG_DIRECTORY "chat.log", &level.log.chat, g_logChat.integer == 2);
+									trap->Print( "Not logging chat events to disk.\n" );
 
 	trap->GetServerinfo( cs, sizeof(cs) );
 	G_LogPrintf( level.log.console, "------------------------------------------------------------\n" );
@@ -687,12 +690,16 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		}
 	}
 
+	//Wolf:
+	//Admin Icon Remap
+	AddRemap("gfx/2d/net", japp_adminicon.string, level.time);
+	trap->SetConfigstring(CS_SHADERSTATE, BuildShaderStateConfig());
+
 	//Raz: Load admins + telemarks
 	AM_LoadAdmins();
 	AM_LoadStrings();
 	AM_LoadTelemarks();
 	JP_Bans_Init();
-	GeoIP::Init();
 
 #ifdef JPLUA
 	JPLua::Init();
@@ -704,7 +711,6 @@ void G_ShutdownGame( int restart ) {
 	gentity_t *ent;
 
 	//	trap->Print ("==== ShutdownGame ====\n");
-	GeoIP::ShutDown();
 	JP_Bans_SaveBans();
 	JP_Bans_Clear();
 	AM_SaveTelemarks();
@@ -1506,7 +1512,6 @@ void BeginIntermission( void ) {
 
 	// send the current scoring to all clients
 	SendScoreboardMessageToAllClients();
-
 }
 
 qboolean DuelLimitHit( void ) {
@@ -1599,7 +1604,6 @@ void ExitLevel( void ) {
 			level.clients[i].pers.connected = CON_CONNECTING;
 		}
 	}
-
 }
 
 // Print to the logfile with a time stamp if it is open
@@ -2984,6 +2988,11 @@ void G_RunFrame( int levelTime ) {
 			}
 			continue;
 		}
+		
+		if (ent->special) {
+			clear_special_power_effect(ent);
+		}
+		
 
 		if ( i < MAX_CLIENTS ) {
 			G_CheckClientTimeouts( ent );
@@ -3049,7 +3058,7 @@ void G_RunFrame( int levelTime ) {
 #define JETPACK_DEFUEL_RATE		200 //approx. 20 seconds of idle use from a fully charged fuel amt
 #define JETPACK_REFUEL_RATE		150 //seems fair
 			if ( ent->client->jetPackOn && level.pause.state == PAUSE_NONE ) { //using jetpack, drain fuel
-				if ( ent->client->jetPackDebReduce < level.time ) {
+				if ( ent->client->jetPackDebReduce < level.time && !japp_allowJetpackUnlimitedFuel.integer ) {
 					if ( ent->client->pers.cmd.upmove > 0 ) { //take more if they're thrusting
 						ent->client->ps.jetpackFuel -= 2;
 					}
@@ -3074,7 +3083,7 @@ void G_RunFrame( int levelTime ) {
 #define CLOAK_DEFUEL_RATE		200 //approx. 20 seconds of idle use from a fully charged fuel amt
 #define CLOAK_REFUEL_RATE		150 //seems fair
 			if ( ent->client->ps.powerups[PW_CLOAKED] && level.pause.state == PAUSE_NONE ) { //using cloak, drain battery
-				if ( ent->client->cloakDebReduce < level.time ) {
+				if ( ent->client->cloakDebReduce < level.time && !japp_allowCloakUnlimitedFuel.integer ) {
 					ent->client->ps.cloakFuel--;
 
 					if ( ent->client->ps.cloakFuel <= 0 ) { //turn it off

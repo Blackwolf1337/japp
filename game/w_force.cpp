@@ -1031,7 +1031,7 @@ void ForceGrip( gentity_t *self ) {
 		return;
 	}
 
-	if ( self->client->ps.weaponTime > 0 ) {
+	if ( self->client->ps.weaponTime > 0 && !japp_gripRoll.integer ) {
 		return;
 	}
 
@@ -1269,6 +1269,8 @@ void ForceLightningDamage( gentity_t *self, gentity_t *traceEnt, vector3 *dir, v
 	self->client->dangerTime = level.time;
 	self->client->ps.eFlags &= ~EF_INVULNERABLE;
 	self->client->invulnerableTimer = 0;
+	if (self->client->invulnerableSpecial)
+		self->client->invulnerableSpecial = qfalse;
 
 	if ( traceEnt && traceEnt->takedamage ) {
 		if ( !traceEnt->client && traceEnt->s.eType == ET_NPC ) { //g2animent
@@ -1473,6 +1475,9 @@ void ForceDrainDamage( gentity_t *self, gentity_t *traceEnt, vector3 *dir, vecto
 	self->client->dangerTime = level.time;
 	self->client->ps.eFlags &= ~EF_INVULNERABLE;
 	self->client->invulnerableTimer = 0;
+	if (self->client->invulnerableSpecial)
+		self->client->invulnerableSpecial = qfalse;
+
 
 	if ( traceEnt && traceEnt->takedamage ) {
 		if ( traceEnt->client && (!OnSameTeam( self, traceEnt ) || g_friendlyFire.integer) && self->client->ps.fd.forceDrainTime < level.time && traceEnt->client->ps.fd.forcePower ) {//an enemy or object
@@ -2914,6 +2919,8 @@ void ForceThrow( gentity_t *self, qboolean pull ) {
 	self->client->dangerTime = level.time;
 	self->client->ps.eFlags &= ~EF_INVULNERABLE;
 	self->client->invulnerableTimer = 0;
+	if (self->client->invulnerableSpecial)
+		self->client->invulnerableSpecial = qfalse;
 
 	if ( self->client->ps.fd.forceGripBeingGripped > level.time ) {
 		self->client->ps.fd.forceGripBeingGripped = 0;
@@ -3038,6 +3045,8 @@ void DoGripAction( gentity_t *self, forcePowers_t forcePower ) {
 	self->client->dangerTime = level.time;
 	self->client->ps.eFlags &= ~EF_INVULNERABLE;
 	self->client->invulnerableTimer = 0;
+	if (self->client->invulnerableSpecial)
+		self->client->invulnerableSpecial = qfalse;
 
 	gripEnt = &g_entities[self->client->ps.fd.forceGripEntityNum];
 

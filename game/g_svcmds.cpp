@@ -157,11 +157,12 @@ static void SV_AdminAdd_f( void ) {
 		argPrivs[MAX_TOKEN_CHARS] = { 0 },
 		argRank[MAX_TOKEN_CHARS] = { 0 },
 		argEffect[MAX_TOKEN_CHARS] = { 0 },
+		argScreenSize[MAX_TOKEN_CHARS] = { 0 },
 		*argMsg = NULL;
 
 
 	if ( trap->Argc() < 5 ) {
-		trap->Print( "Syntax: adminadd <user> <pass> <privileges> <rank> <logineffect> <login message>\n" );
+		trap->Print( "Syntax: adminadd <user> <pass> <privileges> <rank> <logineffect> <smallscreen> <login message>\n" );
 		return;
 	}
 
@@ -169,11 +170,12 @@ static void SV_AdminAdd_f( void ) {
 	trap->Argv( 2, argPass, sizeof(argPass) );
 	trap->Argv( 3, argPrivs, sizeof(argPrivs) );
 	trap->Argv( 4, argRank, sizeof(argRank) );
-	trap->Argv( 5, argEffect, sizeof(argEffect));
-	argMsg = ConcatArgs( 6 );
+	trap->Argv( 5, argEffect, sizeof(argEffect) );
+	trap->Argv( 6, argScreenSize, sizeof(argScreenSize) );
+	argMsg = ConcatArgs( 7 );
 
-	AM_AddAdmin( argUser, argPass, atoll( argPrivs ), atoi( argRank ), argMsg, atoi(argEffect));
-	AM_SaveAdmins();
+	AM_AddAdmin( argUser, argPass, atoll( argPrivs ), atoi( argRank ), argMsg, atoi(argEffect), atoi(argScreenSize) );
+	AM_SaveAdmins(qfalse);
 }
 
 static void SV_AdminDel_f( void ) {
@@ -187,11 +189,25 @@ static void SV_AdminDel_f( void ) {
 	trap->Argv( 1, argUser, sizeof(argUser) );
 
 	AM_DeleteAdmin( argUser );
-	AM_SaveAdmins();
+	AM_SaveAdmins(qfalse);
 }
 
 static void SV_AdminList_f( void ) {
 	AM_ListAdmins();
+}
+
+static void SV_AdminLock_f(void) {
+	char argUser[MAX_TOKEN_CHARS] = { 0 };
+
+	if (trap->Argc() < 2) {
+		trap->Print("Syntax: adminlock <user>\n");
+		return;
+	}
+
+	trap->Argv(1, argUser, sizeof(argUser));
+
+	AM_LockAdmin( argUser );
+	AM_SaveAdmins( qfalse );
 }
 
 static void SV_AdminReload_f( void ) {
@@ -449,6 +465,7 @@ static const svCommand_t svCommands[] = {
 	{ "adminadd", SV_AdminAdd_f },
 	{ "admindel", SV_AdminDel_f },
 	{ "adminlist", SV_AdminList_f },
+	{ "adminlock", SV_AdminLock_f },
 	{ "adminreload", SV_AdminReload_f },
 	{ "allready", SV_AllReady_f },
 	{ "banadd", SV_BanAdd_f },
@@ -491,7 +508,7 @@ qboolean ConsoleCommand( void ) {
 		return qtrue;
 	}
 
-	if ( AM_HandleCommands( nullptr, cmd ) ) {
+	if (AM_HandleCommands(nullptr, cmd)) {
 		return qtrue;
 	}
 

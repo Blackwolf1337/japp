@@ -268,6 +268,477 @@ void SP_misc_model_static( gentity_t *ent ) {
 	G_FreeEntity( ent );
 }
 
+void G_MiscModelExplosion(vector3 mins, vector3 maxs, int size, material_t chunkType)
+{
+	gentity_t *te;
+	vector3 mid;
+
+	VectorAdd(&mins, &maxs, &mid);
+	VectorScale(&mid, 0.5f, &mid);
+
+	te = G_TempEntity(&mid, EV_MISC_MODEL_EXP);
+
+	VectorCopy(&maxs, &te->s.origin2);
+	VectorCopy(&mins, &te->s.angles2);
+	te->s.time = size;
+	te->s.eventParm = chunkType;
+}
+
+void misc_model_breakable_pain(gentity_t *self, gentity_t *other, int damage)
+{
+	if (self->health > 0)
+	{
+		// still alive, react to the pain
+		if (self->paintarget)
+		{
+			G_UseTargets2(self, self->activator, self->paintarget);
+		}
+
+		// Don't do script if dead
+		G_ActivateBehavior(self, BSET_PAIN);
+	}
+}
+
+void G_Chunks(int owner, vector3 origin, const vector3 normal, const vector3 mins, const vector3 maxs,
+	float speed, int numChunks, material_t chunkType, int customChunk, float baseScale)
+{
+	gentity_t *te = G_TempEntity(&origin, EV_DEBRIS);
+
+	//Now it's time to cram everything horribly into the entitystate of an event entity.
+	te->s.owner = owner;
+	VectorCopy(&origin, &te->s.origin);
+	VectorCopy(&normal, &te->s.angles);
+	VectorCopy(&maxs, &te->s.origin2);
+	VectorCopy(&mins, &te->s.angles2);
+	te->s.speed = speed;
+	te->s.eventParm = numChunks;
+	te->s.trickedEntIndex[0] = chunkType;
+	te->s.trickedEntIndex[1] = chunkType;
+	te->s.trickedEntIndex[2] = chunkType;
+	te->s.trickedEntIndex[3] = chunkType;
+	te->s.trickedEntIndex[4] = chunkType;
+	te->s.modelindex = customChunk;
+	te->s.apos.trBase.x = baseScale;
+}
+
+void misc_model_breakable_die(gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath)
+{
+	int		numChunks;
+	float	size = 0, scale;
+	vector3	dir, up, dis;
+
+	if (self->die == NULL)	//i was probably already killed since my die func was removed
+	{
+#ifndef FINAL_BUILD
+		Com_Printf(S_COLOR_YELLOW"Recursive misc_model_breakable_die.  Use targets probably pointing back at self.\n");
+#endif
+		return;	//this happens when you have a cyclic target chain!
+	}
+	//NOTE: Stop any scripts that are currently running (FLUSH)... ?
+	//Turn off animation
+
+	self->health = 0;
+	//Throw some chunks
+	AngleVectors(&self->s.apos.trBase, &dir, NULL, NULL);
+	VectorNormalize( &dir );
+
+	numChunks = random() * 6 + 20;
+
+	VectorSubtract(&self->r.absmax, &self->r.absmin, &dis);
+
+	// This formula really has no logical basis other than the fact that it seemed to be the closest to yielding the results that I wanted.
+	// Volume is length * width * height...then break that volume down based on how many chunks we have
+	scale = sqrt(sqrt(dis.x * dis.y * dis.z)) * 1.75f;
+
+	if (scale > 48)
+	{
+		size = 2;
+	}
+	else if (scale > 24)
+	{
+		size = 1;
+	}
+
+	scale = scale / numChunks;
+
+	if (self->radius > 0.0f)
+	{
+		// designer wants to scale number of chunks, helpful because the above scale code is far from perfect
+		//	I do this after the scale calculation because it seems that the chunk size generally seems to be very close, it's just the number of chunks is a bit weak
+		numChunks *= self->radius;
+	}
+
+	VectorAdd(&self->r.absmax, &self->r.absmin, &dis);
+	VectorScale(&dis, 0.5f, &dis);
+
+	G_Chunks(self->s.number, dis, dir, self->r.absmin, self->r.absmax, 300, numChunks, self->material, self->s.modelGhoul2, scale);
+
+	self->pain = 0;
+	self->die = 0;
+	//	self->e_UseFunc  = useF_NULL;
+
+	self->takedamage = qfalse;
+
+	if (!(self->spawnflags & 4))
+	{//We don't want to stay solid
+		self->s.solid = 0;
+		self->r.contents = 0;
+		self->clipmask = 0;
+
+		trap->LinkEntity((sharedEntity_t *)self);
+	}
+
+	VectorSet(&up, 0, 0, 1);
+
+	if (self->target)
+	{
+		G_UseTargets(self, attacker);
+	}
+
+	if (inflictor->client)
+	{
+		VectorSubtract(&self->r.currentOrigin, &inflictor->r.currentOrigin, &dir);
+		VectorNormalize(&dir);
+	}
+	else
+	{
+		VectorCopy(&up, &dir);
+	}
+
+	if (!(self->spawnflags & 2048)) // NO_EXPLOSION
+	{
+		// Ok, we are allowed to explode, so do it now!
+		if (self->splashDamage > 0 && self->splashRadius > 0)
+		{//explode
+			vector3 org;
+			AddSightEvent(attacker, &self->r.currentOrigin, 256, AEL_DISCOVERED, 100);
+			AddSoundEvent(attacker, &self->r.currentOrigin, 128, AEL_DISCOVERED, qfalse);//FIXME: am I on ground or not?
+																						//FIXME: specify type of explosion?  (barrel, electrical, etc.)  Also, maybe just use the explosion effect below since it's
+																						//				a bit better?
+																						// up the origin a little for the damage check, because several models have their origin on the ground, so they don't alwasy do damage, not the optimal solution...
+			VectorCopy(&self->r.currentOrigin, &org);
+			if (self->r.mins.z > -4)
+			{//origin is going to be below it or very very low in the model
+			 //center the origin
+				org.z = self->r.currentOrigin.z + self->r.mins.z + (self->r.maxs.z - self->r.mins.z) / 2.0f;
+			}
+			G_RadiusDamage(&org, self, self->splashDamage, self->splashRadius, self, NULL, MOD_UNKNOWN);
+
+			G_MiscModelExplosion(self->r.absmin, self->r.absmax, size, self->material);
+			G_Sound(self, CHAN_AUTO, G_SoundIndex("sound/weapons/explosions/cargoexplode.wav"));
+			self->s.loopSound = 0;
+		}
+		else
+		{//just break
+			AddSightEvent(attacker, &self->r.currentOrigin, 128, AEL_DISCOVERED, qfalse);
+			AddSoundEvent(attacker, &self->r.currentOrigin, 64, AEL_SUSPICIOUS, qfalse);//FIXME: am I on ground or not?
+																					   // This is the default explosion
+			G_MiscModelExplosion(self->r.absmin, self->r.absmax, size, self->material);
+			G_Sound(self, CHAN_AUTO, G_SoundIndex("sound/weapons/explosions/cargoexplode.wav"));
+		}
+	}
+
+	self->think = 0;
+	self->nextthink = -1;
+
+	if (self->s.modelindex2 != -1 && !(self->spawnflags & 8))
+	{//FIXME: modelindex doesn't get set to -1 if the damage model doesn't exist
+		self->s.modelindex = self->s.modelindex2;
+		G_ActivateBehavior(self, BSET_DEATH);
+	}
+	else
+	{
+		G_FreeEntity(self);
+	}
+}
+
+void misc_model_throw_at_target4(gentity_t *self, gentity_t *activator)
+{
+	vector3	pushDir, kvel;
+	float	knockback = 200;
+	float	mass = self->mass;
+	gentity_t *target = G_Find(NULL, FOFS(targetname), self->target4);
+	if (!target)
+	{//nothing to throw ourselves at...
+		return;
+	}
+	VectorSubtract(&target->r.currentOrigin, &self->r.currentOrigin, &pushDir);
+	knockback -= VectorNormalize(&pushDir);
+	if (knockback < 100)
+	{
+		knockback = 100;
+	}
+	VectorCopy(&self->r.currentOrigin, &self->s.pos.trBase);
+	self->s.pos.trTime = level.time;								// move a bit on the very first frame
+	if (self->s.pos.trType != TR_INTERPOLATE)
+	{//don't do this to rolling missiles
+		self->s.pos.trType = TR_GRAVITY;
+	}
+
+	if (mass < 50)
+	{//???
+		mass = 50;
+	}
+
+	if (g_gravity.value > 0)
+	{
+		VectorScale(&pushDir, g_knockback.value * knockback / mass * 0.8, &kvel);
+		kvel.z = pushDir.z * g_knockback.value * knockback / mass * 1.5;
+	}
+	else
+	{
+		VectorScale(&pushDir, g_knockback.value * knockback / mass, &kvel);
+	}
+
+	VectorAdd(&self->s.pos.trDelta, &kvel, &self->s.pos.trDelta);
+	if (g_gravity.value > 0)
+	{
+		if (self->s.pos.trDelta.z < knockback)
+		{
+			self->s.pos.trDelta.z = knockback;
+		}
+	}
+	//no trDuration?
+	if (self->think != G_RunObject)
+	{//objects spin themselves?
+	 //spin it
+	 //FIXME: messing with roll ruins the rotational center???
+		self->s.apos.trTime = level.time;
+		self->s.apos.trType = TR_LINEAR;
+		VectorClear(&self->s.apos.trDelta);
+		self->s.apos.trDelta.y = Q_irand(-800, 800);
+	}
+}
+
+void misc_model_use(gentity_t *self, gentity_t *other, gentity_t *activator)
+{
+	if (self->target4)
+	{//throw me at my target!
+		misc_model_throw_at_target4(self, activator);
+		return;
+	}
+
+	if (self->health <= 0 && self->maxHealth > 0)
+	{//used while broken fired target3
+		G_UseTargets2(self, activator, self->target3);
+		return;
+	}
+
+	// Become solid again.
+	if (!self->count)
+	{
+		self->count = 1;
+		self->activator = activator;
+		self->r.svFlags &= ~SVF_NOCLIENT;
+		self->s.eFlags &= ~EF_NODRAW;
+	}
+
+	G_ActivateBehavior(self, BSET_USE);
+	//Don't explode if they've requested it to not
+	if (self->spawnflags & 64)
+	{//Usemodels toggling
+		if (self->spawnflags & 32)
+		{
+			if (self->s.modelindex == self->sound1to2)
+			{
+				self->s.modelindex = self->sound2to1;
+			}
+			else
+			{
+				self->s.modelindex = self->sound1to2;
+			}
+		}
+
+		return;
+	}
+
+	self->die = misc_model_breakable_die;
+	misc_model_breakable_die(self, other, activator, self->health, MOD_UNKNOWN);
+}
+
+void misc_model_breakable_gravity_init(gentity_t *ent, qboolean dropToFloor)
+{
+	trace_t		tr;
+	vector3		top, bottom;
+
+	ent->s.eType = ET_GENERAL;
+	//ent->s.eFlags |= EF_BOUNCE_HALF;	// FIXME
+	ent->clipmask = MASK_SOLID | CONTENTS_BODY | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP;//?
+	ent->physicsBounce = ent->mass = VectorLength(&ent->r.maxs) + VectorLength(&ent->r.mins);
+
+	//drop to floor
+
+	if (dropToFloor)
+	{
+		VectorCopy(&ent->r.currentOrigin, &top);
+		top.z += 1;
+		VectorCopy(&ent->r.currentOrigin, &bottom);
+		bottom.z = MIN_WORLD_COORD;
+		trap->Trace(&tr, &top, &ent->r.mins, &ent->r.maxs, &bottom, ent->s.number, MASK_NPCSOLID, qfalse, 0, 0);
+		if (!tr.allsolid && !tr.startsolid && tr.fraction < 1.0)
+		{
+			G_SetOrigin(ent, &tr.endpos);
+			trap->LinkEntity((sharedEntity_t *)ent);
+		}
+	}
+	else
+	{
+		G_SetOrigin(ent, &ent->r.currentOrigin);
+		trap->LinkEntity((sharedEntity_t *)ent);
+	}
+	//set up for object thinking
+	if (VectorCompare(&ent->s.pos.trDelta, &vec3_origin))
+	{//not moving
+		ent->s.pos.trType = TR_STATIONARY;
+	}
+	else
+	{
+		ent->s.pos.trType = TR_GRAVITY;
+	}
+	VectorCopy(&ent->r.currentOrigin, &ent->s.pos.trBase);
+	VectorClear(&ent->s.pos.trDelta);
+	ent->s.pos.trTime = level.time;
+	if (VectorCompare(&ent->s.apos.trDelta, &vec3_origin))
+	{//not moving
+		ent->s.apos.trType = TR_STATIONARY;
+	}
+	else
+	{
+		ent->s.apos.trType = TR_LINEAR;
+	}
+	VectorCopy(&ent->r.currentAngles, &ent->s.apos.trBase);
+	VectorClear(&ent->s.apos.trDelta);
+	ent->s.apos.trTime = level.time;
+}
+
+void misc_model_breakable_init(gentity_t *ent)
+{
+	if (!ent->model) {
+		trap->Error(ERR_DROP, "no model set on %s at (%.1f %.1f %.1f)\n", ent->classname, ent->s.origin.x, ent->s.origin.y, ent->s.origin.z);
+	}
+
+	//Main model
+	ent->s.modelindex = ent->sound2to1 = G_ModelIndex(ent->model);
+
+	if (ent->spawnflags & 1)
+	{//Blocks movement
+		ent->r.contents = CONTENTS_SOLID | CONTENTS_OPAQUE | CONTENTS_BODY | CONTENTS_MONSTERCLIP | CONTENTS_BOTCLIP;//Was CONTENTS_SOLID, but only architecture should be this
+	}
+	else if (ent->health)
+	{//Can only be shot
+		ent->r.contents = CONTENTS_SHOTCLIP;
+	}
+
+	ent->use = misc_model_use;
+
+	if (ent->health)
+	{
+		G_SoundIndex("sound/weapons/explosions/cargoexplode.wav");
+		ent->maxHealth = ent->health;
+		ent->takedamage = qtrue;
+		ent->pain = misc_model_breakable_pain;
+		ent->die = misc_model_breakable_die;
+	}
+}
+
+/*QUAKED misc_model_breakable (1 0 0) (-16 -16 -16) (16 16 16) SOLID AUTOANIMATE DEADSOLID NO_DMODEL NO_SMOKE USE_MODEL USE_NOT_BREAK PLAYER_USE NO_EXPLOSION
+SOLID - Movement is blocked by it, if not set, can still be broken by explosions and shots if it has health
+AUTOANIMATE - Will cycle it's anim
+DEADSOLID - Stay solid even when destroyed (in case damage model is rather large).
+NO_DMODEL - Makes it NOT display a damage model when destroyed, even if one exists
+USE_MODEL - When used, will toggle to it's usemodel (model name + "_u1.md3")... this obviously does nothing if USE_NOT_BREAK is not checked
+USE_NOT_BREAK - Using it, doesn't make it break, still can be destroyed by damage
+PLAYER_USE - Player can use it with the use button
+NO_EXPLOSION - By default, will explode when it dies...this is your override.
+
+"model"		arbitrary .md3 file to display
+"health"	how much health to have - default is zero (not breakable)  If you don't set the SOLID flag, but give it health, it can be shot but will not block NPCs or players from moving
+"targetname" when used, dies and displays damagemodel, if any (if not, removes itself)
+"target" What to use when it dies
+"target2" What to use when it's repaired
+"target3" What to use when it's used while it's broken
+"paintarget" target to fire when hit (but not destroyed)
+"count"  the amount of armor/health/ammo given (default 50)
+"gravity"	if set to 1, this will be affected by gravity
+"radius"  Chunk code tries to pick a good volume of chunks, but you can alter this to scale the number of spawned chunks. (default 1)  (.5) is half as many chunks, (2) is twice as many chunks
+
+Damage: default is none
+"splashDamage" - damage to do (will make it explode on death)
+"splashRadius" - radius for above damage
+
+"team" - This cannot take damage from members of this team:
+"player"
+"neutral"
+"enemy"
+
+"material" - default is "8 - MAT_NONE" - choose from this list:
+0 = MAT_METAL		(grey metal)
+1 = MAT_GLASS
+2 = MAT_ELECTRICAL	(sparks only)
+3 = MAT_ELEC_METAL	(METAL chunks and sparks)
+4 =	MAT_DRK_STONE	(brown stone chunks)
+5 =	MAT_LT_STONE	(tan stone chunks)
+6 =	MAT_GLASS_METAL (glass and METAL chunks)
+7 = MAT_METAL2		(blue/grey metal)
+8 = MAT_NONE		(no chunks-DEFAULT)
+9 = MAT_GREY_STONE	(grey colored stone)
+10 = MAT_METAL3		(METAL and METAL2 chunk combo)
+11 = MAT_CRATE1		(yellow multi-colored crate chunks)
+12 = MAT_GRATE1		(grate chunks--looks horrible right now)
+13 = MAT_ROPE		(for yavin_trial, no chunks, just wispy bits )
+14 = MAT_CRATE2		(red multi-colored crate chunks)
+15 = MAT_WHITE_METAL (white angular chunks for Stu, NS_hideout )
+FIXME/TODO:
+set size better? - FIXED
+multiple damage models?
+custom explosion effect/sound?
+*/
+void misc_model_breakable_gravity_init(gentity_t *ent, qboolean dropToFloor);
+void misc_model_breakable_init(gentity_t *ent);
+
+void SP_misc_model_breakable( gentity_t *ent )
+
+{
+
+	float grav;
+	G_SpawnInt( "material", "8", (int*)&ent->material );
+	G_SpawnFloat( "radius", "1", &ent->radius ); // used to scale chunk code if desired by a designer
+
+	misc_model_breakable_init( ent );
+	
+
+	if ( !ent->r.mins.x && !ent->r.mins.y && !ent->r.mins.z )
+	{
+		VectorSet (&ent->r.mins, -16, -16, -16);
+	}
+
+	if ( !ent->r.maxs.x && !ent->r.maxs.y && !ent->r.maxs.z )
+	{
+		VectorSet (&ent->r.maxs, 16, 16, 16);
+	}
+
+	G_SetOrigin( ent, &ent->s.origin );
+	G_SetAngles( ent, &ent->s.angles );
+	trap->LinkEntity ((sharedEntity_t *)ent);
+
+	if ( ent->spawnflags & 128 )
+	{//Can be used by the player's BUTTON_USE
+		ent->r.svFlags |= SVF_PLAYER_USABLE;
+	}
+
+	ent->s.teamowner = 0;
+
+
+	G_SpawnFloat( "gravity", "0", &grav );
+
+	if ( grav )
+	{//affected by gravity
+		G_SetAngles( ent, &ent->s.angles );
+		G_SetOrigin( ent, &ent->r.currentOrigin );
+		misc_model_breakable_gravity_init( ent, qtrue );
+	}
+}
+
 /*QUAKED misc_G2model (1 0 0) (-16 -16 -16) (16 16 16)
 "model"		arbitrary .glm file to display
 */
@@ -2042,6 +2513,58 @@ void SP_fx_runner( gentity_t *ent ) {
 	VectorScale( &ent->r.maxs, -1, &ent->r.mins );
 
 	trap->LinkEntity( (sharedEntity_t *)ent );
+}
+
+//Wolf:
+//Spawn the effect instantly
+//Can be modified with ent->speed
+//ent->speed = think, so it spawns into the next level.time
+void SP_fx_runner_S(gentity_t *ent) {
+	const char *fxFile;
+
+	G_SpawnString("fxFile", "", (char **)&fxFile);
+	// Get our defaults
+	G_SpawnInt("delay", "200", &ent->delay);
+	G_SpawnFloat("random", "0", &ent->random);
+	G_SpawnInt("splashRadius", "16", &ent->splashRadius);
+	G_SpawnInt("splashDamage", "5", &ent->splashDamage);
+
+	//Raz: Hackhackhack for fx_runners
+	if (ent->fullName)
+		fxFile = ent->fullName;
+
+	if (!ent->s.angles.x && !ent->s.angles.y && !ent->s.angles.z) {
+		// didn't have angles, so give us the default of up
+		VectorSet(&ent->s.angles, -90, 0, 0);
+	}
+
+	if (!fxFile || !fxFile[0]) {
+		Com_Printf(S_COLOR_RED"ERROR: fx_runner %s at %s has no fxFile specified\n", ent->targetname, vtos(&ent->s.origin));
+		G_FreeEntity(ent);
+		return;
+	}
+
+	// Try and associate an effect file, unfortunately we won't know if this worked or not
+	//	until the CGAME trys to register it...
+	ent->s.modelindex = G_EffectIndex(fxFile);
+
+	// important info transmitted
+	ent->s.eType = ET_FX;
+	ent->s.speed = ent->delay;
+	ent->s.time = ent->random;
+	ent->s.modelindex2 = FX_STATE_OFF;
+
+	// Give us a bit of time to spawn in the other entities, since we may have to target one of 'em
+	ent->think = fx_runner_link;
+	ent->nextthink = level.time + ent->speed;
+
+	// Save our position and link us up!
+	G_SetOrigin(ent, &ent->s.origin);
+
+	VectorSet(&ent->r.maxs, FX_ENT_RADIUS, FX_ENT_RADIUS, FX_ENT_RADIUS);
+	VectorScale(&ent->r.maxs, -1, &ent->r.mins);
+
+	trap->LinkEntity((sharedEntity_t *)ent);
 }
 
 /*QUAKED fx_wind (0 .5 .8) (-16 -16 -16) (16 16 16) NORMAL CONSTANT GUSTING SWIRLING x  FOG LIGHT_FOG

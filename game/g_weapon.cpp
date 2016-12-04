@@ -2934,6 +2934,7 @@ void Weapon_GrapplingHook_Fire( gentity_t *ent ) {
 	if ( !ent->client->fireHeld && !ent->client->hook ) {
 		ent->client->hook = fire_grapple( ent, &muzzle, &forward );
 	}
+	G_SoundEntityE(ent, CHAN_WEAPON, G_SoundIndex( "sound/weapons/blaster/reflect1.mp3" ));
 
 	ent->client->fireHeld = qtrue;
 	ent->client->hookHasBeenFired = qtrue;

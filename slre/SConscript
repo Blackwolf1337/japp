@@ -7,29 +7,29 @@ env.VariantDir(
 	'#',
 	duplicate = 0
 )
-maxmind_env = env.Clone()
+slre = env.Clone()
 
 # sources
 files = [
-	'maxmind/maxminddb.c',
+	'slre/slre.c',
 ]
 files = [build_dir + f for f in files]
 
 # project settings
 if realcc == 'gcc' or realcc == 'clang':
 	if plat != 'Windows':
-		maxmind_env['CCFLAGS'] += [
+		slre['CCFLAGS'] += [
 			'-fPIC',
 		]
-	maxmind_env['CFLAGS'] += [
+	slre['CFLAGS'] += [
 		'-std=c99',
 	]
-	maxmind_env['CPPPATH'] += [
-	'#' + os.sep + 'maxmind'
+	slre['CPPPATH'] += [
+	'#' + os.sep + 'slre'
 ]
 # targets
-result = maxmind_env.StaticLibrary(
-	build_dir + 'libmaxmind',
+result = slre.StaticLibrary(
+	build_dir + 'libslre',
 	files
 )
 Return( "result" )

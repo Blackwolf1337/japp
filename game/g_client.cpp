@@ -6,7 +6,6 @@
 #include "bg_luaevent.h"
 #include "JAPP/jp_csflags.h"
 #include "bg_lua.h"
-#include <unordered_map>
 
 // g_client.c -- client functions that don't happen every frame
 
@@ -2083,6 +2082,7 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	Q_strncpyz( color2, Info_ValueForKey( userinfo, "color2" ), sizeof(color2) );
 	Q_strncpyz( cp_sbRGB1, Info_ValueForKey( userinfo, "cp_sbRGB1" ), sizeof(cp_sbRGB1) );
 	Q_strncpyz( cp_sbRGB2, Info_ValueForKey( userinfo, "cp_sbRGB2" ), sizeof(cp_sbRGB2) );
+	Q_strncpyz( client->pers.clanpass, Info_ValueForKey(userinfo, "cp_clanPwd"), sizeof(client->pers.clanpass));
 
 	//Raz: Gender hints
 	s = Info_ValueForKey( userinfo, "sex" );
@@ -2191,8 +2191,6 @@ static qboolean CompareIPString( const char *ip1, const char *ip2 ) {
 // Otherwise, the client will be sent the current gamestate and will eventually get to ClientBegin
 // firstTime will be qtrue the very first time a client connects to the server machine, but qfalse on map changes and
 //	tournament restarts.
-static std::unordered_map<int, GeoIPData*> pending_list;
-
 const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	gentity_t *ent = g_entities + clientNum, *te = NULL;
 	gclient_t *client;
@@ -2356,50 +2354,12 @@ const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		Q_strncpyz( client->sess.IP, tmpIP, sizeof(client->sess.IP) );
 	}
 
-	// get GeoIP data
-	if ( japp_detectCountry.integer && !isBot && firstTime && Q_stricmp( value, "localhost" ) ) {
-		GeoIPData *gip = pending_list[clientNum];
-		if ( !gip ) {
-			gip = GeoIP::GetIPInfo( value );
-			if ( gip ) {
-				pending_list[clientNum] = gip;
-				return "Please wait...";
-			}
-			// else GeoIP stuff isn't working
-		}
-		else if ( gip ) {
-			if ( !gip->isReady() ) {
-				return "Please wait...";
-			}
-			if ( gip->getStatus() ) {
-				const char *sData = gip->getData()->c_str();
-				trap->Print( "Got GeoIP data. IP: %s Data: %s",
-					gip->getIp().c_str(), sData
-				);
-				Q_strncpyz( ent->client->sess.geoipData, sData, sizeof(ent->client->sess.geoipData) );
-			}
-			else {
-				trap->Print( "Failed to Get GeoIP data. IP: %s Error: %s",
-					gip->getIp().c_str(), gip->getData()->c_str()
-				);
-				Q_strncpyz( ent->client->sess.geoipData, "Unknown", sizeof(ent->client->sess.geoipData) );
-			}
-			delete gip;
-			pending_list[clientNum] = nullptr;
-		}
-	}
-
 	G_LogPrintf(level.log.console, "ClientConnect: %i (%s" S_COLOR_WHITE ") [IP: %s" S_COLOR_WHITE "]\n", clientNum, client->pers.netname, tmpIP );
 
 	// don't do the "xxx connected" messages if they were caried over from previous level
 	if ( firstTime ) {
-		trap->SendServerCommand( -1,
-			va( "print \"%s" S_COLOR_WHITE " %s From: %s\n\"",
-				client->pers.netname,
-				G_GetStringEdString( "MP_SVGAME", "PLCONNECT" ),
-				ent->client->sess.geoipData
-			)
-		);
+		trap->SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE " %s\n\"", client->pers.netname,
+			G_GetStringEdString( "MP_SVGAME", "PLCONNECT" ) ) );
 	}
 
 	if ( level.gametype >= GT_TEAM && client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -2515,6 +2475,7 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 		{
 			G_MuteSound( ent->client->ps.fd.killSoundEntIndex[i - 50], CHAN_VOICE );
 		}
+		i++;
 	}
 
 	memset( &client->ps, 0, sizeof(client->ps) );
@@ -3567,6 +3528,10 @@ void ClientSpawn( gentity_t *ent ) {
 		trap->LinkEntity( (sharedEntity_t *)ent );
 	}
 
+	if ( ent->client->invulnerableSpecial ) {
+		ent->client->invulnerableSpecial = qfalse;
+	}
+
 	if ( g_spawnInvulnerability.integer ) {
 		ent->client->ps.eFlags |= EF_INVULNERABLE;
 		ent->client->invulnerableTimer = level.time + g_spawnInvulnerability.integer;
@@ -3611,9 +3576,16 @@ void ClientDisconnect( int clientNum ) {
 	int i;
 
 	// cleanup if we are kicking a bot that hasn't spawned yet
+
 	G_RemoveQueuedBotBegin( clientNum );
 
 	ent = g_entities + clientNum;
+	
+	if ( ent->client->pers.adminUser ) {
+		AM_Logout( ent );
+	}
+
+
 	if ( !ent->client || ent->client->pers.connected == CON_DISCONNECTED ) {
 		G_LogPrintf( level.log.security, "ClientDisconnect: tried to disconnect an inactive client %i\n", clientNum );
 		return;
@@ -3665,6 +3637,10 @@ void ClientDisconnect( int clientNum ) {
 	// kill grapple
 	if ( ent->client->hook ) {
 		Weapon_HookFree( ent->client->hook );
+	}
+
+	if ( ent->client->pers.tempprivs > 0u ) {
+		ent->client->pers.tempprivs = 0u;
 	}
 
 	// if we are playing in tourney mode, give a win to the other player and clear his frags for this round

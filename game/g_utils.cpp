@@ -10,10 +10,12 @@
 
 #include <unordered_map>
 
+
 typedef struct shaderRemap_s {
 	char oldShader[MAX_QPATH], newShader[MAX_QPATH];
 	float timeOffset;
 } shaderRemap_t;
+
 
 #define MAX_SHADER_REMAPS (128)
 
@@ -919,6 +921,67 @@ void G_SoundAtLoc( vector3 *loc, int channel, int soundIndex ) {
 	te->s.saberEntityNum = channel;
 }
 
+void G_SoundEntityE(gentity_t *ent, int channel, int soundIndex) {
+	gentity_t *te;
+
+	assert(soundIndex);
+
+	te = G_TempEntity(&ent->r.currentOrigin, EV_ENTITY_SOUND/*, channel*/);
+	te->s.eventParm = soundIndex;
+	te->s.clientNum = ent->s.number;
+	te->s.trickedEntIndex[0] = channel;
+
+	// let the client remember the index of the player entity so he can kill the most recent sound on request
+	if (ent && ent->client && channel > TRACK_CHANNEL_NONE) {
+		if (g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]].inuse && ent->client->ps.fd.killSoundEntIndex[channel - 50] > MAX_CLIENTS) {
+			G_MuteSound(ent->client->ps.fd.killSoundEntIndex[channel - 50], CHAN_VOICE);
+
+			if (ent->client->ps.fd.killSoundEntIndex[channel - 50] > MAX_CLIENTS &&
+				g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]].inuse)
+				G_FreeEntity(&g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]]);
+			ent->client->ps.fd.killSoundEntIndex[channel - 50] = 0;
+		}
+
+		ent->client->ps.fd.killSoundEntIndex[channel - 50] = te->s.number;
+		te->s.trickedEntIndex[0] = ent->s.number;
+		te->s.eFlags = EF_SOUNDTRACKER;
+		//Raz: Looping sound fixed so all players get information about it, which can be needed later
+		te->r.svFlags |= SVF_BROADCAST;
+		te->freeAfterEvent = qtrue;
+	}
+}
+
+void G_SoundEntityT(gentity_t *ent, int channel, int soundIndex, int starttime) {
+	gentity_t *te;
+
+	assert(soundIndex);
+
+	te = G_TempEntity(&ent->r.currentOrigin, EV_ENTITY_SOUND/*, channel*/);
+	te->s.eventParm = soundIndex;
+	te->s.clientNum = ent->s.number;
+	te->s.trickedEntIndex[0] = channel;
+	te->nextthink = level.time + starttime;
+
+	// let the client remember the index of the player entity so he can kill the most recent sound on request
+	if (ent && ent->client && channel > TRACK_CHANNEL_NONE) {
+		if (g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]].inuse && ent->client->ps.fd.killSoundEntIndex[channel - 50] > MAX_CLIENTS) {
+			G_MuteSound(ent->client->ps.fd.killSoundEntIndex[channel - 50], CHAN_VOICE);
+
+			if (ent->client->ps.fd.killSoundEntIndex[channel - 50] > MAX_CLIENTS &&
+				g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]].inuse)
+				G_FreeEntity(&g_entities[ent->client->ps.fd.killSoundEntIndex[channel - 50]]);
+			ent->client->ps.fd.killSoundEntIndex[channel - 50] = 0;
+		}
+
+		ent->client->ps.fd.killSoundEntIndex[channel - 50] = te->s.number;
+		te->s.trickedEntIndex[0] = ent->s.number;
+		te->s.eFlags = EF_SOUNDTRACKER;
+		//Raz: Looping sound fixed so all players get information about it, which can be needed later
+		te->r.svFlags |= SVF_BROADCAST;
+		te->freeAfterEvent = qtrue;
+	}
+}
+
 void G_EntitySound( gentity_t *ent, int channel, int soundIndex ) {
 	gentity_t *te = G_TempEntity( &ent->r.currentOrigin, EV_ENTITY_SOUND );
 	te->s.eventParm = soundIndex;
@@ -1724,7 +1787,7 @@ const char *G_PrintClient( int clientNum ) {
 	char *out = buf[(index++)&(NUM_CLIENTINFOBUFFERS-1)];
 	gentity_t *ent = g_entities + clientNum;
 
-	Com_sprintf( out, MAX_STRING_CHARS, "[%2i](%s):%s", clientNum, ent->client->pers.netname, ent->client->sess.IP );
+	Com_sprintf( out, MAX_STRING_CHARS, "[%2i](%s^7):%s", clientNum, ent->client->pers.netname, ent->client->sess.IP );
 
 	return out;
 }

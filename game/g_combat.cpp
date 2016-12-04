@@ -3904,8 +3904,15 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vecto
 			return;
 		}
 
+		if ( targ && targ->client && targ->client->invulnerableSpecial && attacker && attacker->client && targ != attacker) {
+			targ->client->invulnerableTimer = level.time + 5000;
+			targ->client->ps.eFlags |= EF_INVULNERABLE;
+			return;
+		}
+
 		if ( targ && targ->client && (targ->client->ps.eFlags & EF_INVULNERABLE) &&
 			attacker && attacker->client && targ != attacker ) {
+
 			if ( targ->client->invulnerableTimer <= level.time ) {
 				targ->client->ps.eFlags &= ~EF_INVULNERABLE;
 			}
