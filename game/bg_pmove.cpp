@@ -8754,6 +8754,7 @@ void PM_VehicleViewAngles( playerState_t *ps, bgEntity_t *veh, usercmd_t *ucmd )
 #endif //VEH_CONTROL_SCHEME_4
 		{//only if not if doing special free-roll/pitch control
 			setAngles = qtrue;
+			clampMin.pitch = -pVeh->m_pVehicleInfo->lookPitch;
 			clampMax.pitch = pVeh->m_pVehicleInfo->lookPitch;
 			clampMin.yaw = clampMax.yaw = 0;
 			clampMin.roll = clampMax.roll = -1;
