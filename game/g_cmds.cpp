@@ -113,9 +113,9 @@ static void G_Give( gentity_t *ent, const char *name, const char *args, int argc
 
 	if ( give_all || !Q_stricmp( name, "ammo" ) ) {
 		int num = 999;
-		if ( argc == 3 ) {
+		if ( argc == 3 )
 			num = Q_clampi( 0, atoi( args ), 999 );
-		}
+			num = atoi( args );
 		for ( i = AMMO_BLASTER; i < AMMO_MAX; i++ )
 			ent->client->ps.ammo[i] = num;
 		if ( !give_all )
@@ -1263,7 +1263,7 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 						return;
 					}
 
-					//Zï¿½hlt Nutzer
+					//Zählt Nutzer
 					users = cJSON_GetObjectItem(root, "members");
 					usersCounts = cJSON_GetArraySize(users);
 
@@ -1457,7 +1457,7 @@ static void Cmd_SetClanpass_f( gentity_t *ent ) {
 	p = ConcatArgs(1);
 
 	strncpy(ent->client->pers.clanpass, p, sizeof(ent->client->pers.clanpass));
-	trap->SendServerCommand(ent - g_entities, va("print \"^1Clanpass set to ^7%s\n^1Use ^2cp_clanPwd ^7to set ur password permanently\n\"", ent->client->pers.clanpass));
+	trap->SendServerCommand(ent - g_entities, va("print \"^1Clanpass set to ^7%s\n^1Use ^2cp_clanPwd ^1to set your password permanently^7\n\"", ent->client->pers.clanpass));
 }
 
 static void Cmd_ClanWhoIs_f( gentity_t *ent ) {
@@ -2534,10 +2534,6 @@ void Cmd_SaberAttackCycle_f( gentity_t *ent ) {
 
 	if ( ent->client->ps.weapon != WP_SABER )
 		return;
-
-	if ( !japp_allowToggleSaberInSpecial.integer && BG_SaberInSpecial( ent->client->ps.saberMove ) ) {
-		return;
-	}
 
 	if ( ent->client->saber[0].model[0] && ent->client->saber[1].model[0] ) {
 		// no cycling for akimbo
@@ -3676,8 +3672,9 @@ static void Cmd_AMInfo_f( gentity_t *ent ) {
 			}
 			Q_PrintBuffer( &pb, aminfoSettings[i].str );
 		}
+		Q_PrintBuffer(&pb, "^7, ^1amlogin^7, ^1amlogout^7");
 		if (ent->client->pers.adminUser && ent->client->pers.adminUser->rank > 0) {
-			Q_PrintBuffer(&pb, "\n\n^1Extra: amtag, amaccount, ");
+			Q_PrintBuffer(&pb, "^1\n\nExtra: amtag, amaccount, ");
 			if (ent->client->pers.adminUser->rank > 6) {
 				Q_PrintBuffer(&pb, "amjump");
 			}
@@ -4668,7 +4665,7 @@ static const command_t commands[] = {
 	{ "debugBMove_Up", Cmd_BotMoveUp_f, GTB_ALL, CMDFLAG_CHEAT | CMDFLAG_ALIVE },
 	{ "drop", Cmd_Drop_f, GTB_ALL, CMDFLAG_NOINTERMISSION },
 	{ "duelteam", Cmd_DuelTeam_f, GTB_DUEL | GTB_POWERDUEL, CMDFLAG_NOINTERMISSION },
-	{ "engage_fullforceduel", Cmd_EngageFullForceDuel_f, GTB_ALL, CMDFLAG_ALIVE | CMDFLAG_NOINTERMISSION },
+	{ "engageduel_fullforce", Cmd_EngageFullForceDuel_f, GTB_ALL, CMDFLAG_ALIVE | CMDFLAG_NOINTERMISSION },
 	{ "follow", Cmd_Follow_f, GTB_ALL, CMDFLAG_NOINTERMISSION },
 	{ "follownext", Cmd_FollowNext_f, GTB_ALL, CMDFLAG_NOINTERMISSION },
 	{ "followprev", Cmd_FollowPrev_f, GTB_ALL, CMDFLAG_NOINTERMISSION },

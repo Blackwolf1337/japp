@@ -28,6 +28,7 @@
 	* Added functions to clear arrays and objects
 	* Added extended lookup, to allow retreival of deeply nested items in 1 call
 	* Added 64 bit integer support
+	
 */
 
 // cJSON
@@ -134,15 +135,15 @@ static int cJSON_strcasecmp( const char *s1, const char *s2 ) {
 
 #endif
 
-static uint32_t cJSON_GenerateHashValue( const char *name, const int size ) {
+static long cJSON_GenerateHashValue( const char *name, const int size ) {
 	int		i;
-	uint32_t	hash;
+	long	hash;
 
 	hash = 0;
 	i = 0;
 	while ( name[i] != '\0' ) {
 		char letter = (char)tolower( name[i] );
-		hash += (uint32_t)(letter)*(i + 119);
+		hash += (long)(letter)*(i + 119);
 		i++;
 	}
 	hash = (hash ^ (hash >> 10) ^ (hash >> 20));
@@ -845,7 +846,7 @@ cJSON *cJSON_GetArrayItem( cJSON *arry, int item ) {
 
 cJSON *cJSON_GetObjectItem( cJSON *object, const char *string ) {
 	cJSON *c;
-	uint32_t hash;
+	long hash;
 	if ( !object || object->type != cJSON_Object ) {
 		return 0;	// Not an object
 	}
@@ -1070,7 +1071,7 @@ void cJSON_InsertItemInArray( cJSON *arry, cJSON *item, int before ) {
 }
 
 void cJSON_AddItemToObject( cJSON *object, const char *string, cJSON *item ) {
-	uint32_t hash;
+	long hash;
 	if ( object->type != cJSON_Object ) {
 		return;
 	}
@@ -1152,7 +1153,7 @@ void cJSON_DeleteItemFromArray( cJSON *arry, int which ) {
 
 cJSON *cJSON_DetachItemFromObject( cJSON *object, const char *string ) {
 	cJSON *c = 0, *p = 0;
-	uint32_t hash;
+	long hash;
 
 	hash = cJSON_GenerateHashValue( string, cJSON_HashTableSize );
 
@@ -1404,7 +1405,6 @@ cJSON *cJSON_CreateLongInteger(int64_t num){
 	item->valuedouble = (double)num;
 	item->valueint = (int)num;
 	item->valuelong = num;
-	return item;
 }
 
 cJSON *cJSON_CreateString( const char *string ) {

@@ -3,7 +3,6 @@
 #elif defined(PROJECT_CGAME)
 #include "cg_local.h"
 #endif
-#include "ui/ui_fonts.h"
 
 #include "bg_luainternal.h"
 
@@ -19,11 +18,11 @@ extern int lastluaid;
 
 namespace JPLua {
 
-	const char *baseDir = "lua/";
+	static const char *baseDir = "lua/";
 	#if defined(PROJECT_GAME)
-	const char *pluginDir = "lua/sv/";
+	static const char *pluginDir = "lua/sv/";
 	#elif defined(PROJECT_CGAME)
-	const char *pluginDir = "lua/cl/";
+	static const char *pluginDir = "lua/cl/";
 	#endif
 
 	luaState_t ls;
@@ -333,7 +332,6 @@ namespace JPLua {
 		for ( int i = 0; i < numComponents && i < ARRAY_LEN(colourComponents); i++ ) {
 			lua_getfield( L, idx, colourComponents[i] );
 			out[i] = lua_tonumber( L, -1 );
-			lua_pop(L, 1);
 		}
 	}
 
@@ -675,7 +673,7 @@ namespace JPLua {
 				lua_pushstring(L, "requiredJPLuaversion"); lua_pushstring(L, buf); lua_settable(L, top2);
 				semver_render(&plugin->version, buf);
 				lua_pushstring(L, "requiredJPLuaversion"); lua_pushstring(L, buf); lua_settable(L, top2);
-
+				
 				lua_settable(L, top);
 			}
 		}
@@ -961,8 +959,8 @@ namespace JPLua {
 		int iMenuFont = luaL_checkinteger( L, 7 );
 		int customFont = luaL_checkinteger( L, 8 );
 
-		const Font font( iMenuFont, scale, customFont );
-		font.Paint( x, y, text, &colour, style );
+
+		Text_Paint( x, y, scale, &colour, text, 0.0f, 0, style, iMenuFont, customFont );
 
 		return 0;
 	}
@@ -972,7 +970,7 @@ namespace JPLua {
 	static int Export_Font_StringHeightPixels( lua_State *L ) {
 		const char *text = luaL_checkstring( L, 1 );
 		float scale = luaL_checknumber( L, 2 );
-		qhandle_t fontHandle = luaL_checkinteger( L, 3 );
+		qhandle_t font = luaL_checkinteger( L, 3 );
 		int customFont = 0;
 		if ( lua_isboolean( L, 4 ) ) {
 			customFont = lua_toboolean( L, 4 );
@@ -982,8 +980,7 @@ namespace JPLua {
 			lua_pushnil( L );
 		}
 		else {
-			const Font font( fontHandle, scale, customFont );
-			lua_pushnumber( L, font.Height( text ) );
+			lua_pushnumber( L, Text_Height( text, scale, font, customFont ) );
 		}
 		return 1;
 	}
@@ -993,7 +990,7 @@ namespace JPLua {
 	static int Export_Font_StringLengthPixels( lua_State *L ) {
 		const char *text = luaL_checkstring( L, 1 );
 		float scale = luaL_checknumber( L, 2 );
-		qhandle_t fontHandle = luaL_checkinteger( L, 3 );
+		qhandle_t font = luaL_checkinteger( L, 3 );
 		int customFont = 0;
 		if ( lua_isboolean( L, 4 ) ) {
 			customFont = lua_toboolean( L, 4 );
@@ -1003,8 +1000,7 @@ namespace JPLua {
 			lua_pushnil( L );
 		}
 		else {
-			const Font font( fontHandle, scale, customFont );
-			lua_pushnumber( L, font.Width( text ) );
+			lua_pushnumber( L, Text_Width( text, scale, font, customFont ) );
 		}
 		return 1;
 	}
@@ -1564,7 +1560,6 @@ namespace JPLua {
 		{ "FindEntityByClassname", FindEntityByClassName },
 	#endif
 		{ "GetEntity", Entity_Get }, // GetEntity(num) or GetEntity() for full list
-		{ "GetEntityTable", Entity_GetMetaTable }, // Entity.meta GetEntityTable()
 		{ "GetFileList", File_GetFileList}, // table GetFileList(string path, string extension)
 	#ifdef PROJECT_CGAME
 		{ "GetFPS", Export_GetFPS }, // integer GetFPS()
@@ -1602,7 +1597,6 @@ namespace JPLua {
 	#endif
 		{ "GetTime", Export_GetTime }, // integer GetTime()
 	#ifdef PROJECT_CGAME
-
 		{ "IsKeyDown", Export_IsKeyDown }, // boolean IsKeyDown( integer )
 	#endif
 	#ifdef PROJECT_GAME
@@ -1679,7 +1673,7 @@ namespace JPLua {
 		}
 
 		// set the ls.version
-		semver_parse( "13.5.0", &jpluaVersion );
+		semver_parse( "13.3.7", &jpluaVersion );
 
 		// set the callback in case of an error
 		lua_atpanic( ls.L, Error );

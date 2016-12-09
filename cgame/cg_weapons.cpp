@@ -3,7 +3,6 @@
 #include "fx_local.h"
 #include "cg_media.h"
 #include "ui/ui_shared.h"
-#include "ui/ui_fonts.h"
 
 // set up the appropriate ghoul2 info to a refent
 void CG_SetGhoul2InfoRef( refEntity_t *ent, refEntity_t	*s1 ) {
@@ -912,9 +911,12 @@ void CG_DrawWeaponSelect( void ) {
 		else {
 			s = cg_weapons[cg.weaponSelect].item->classname;
 		}
-		const Font font( FONT_SMALL, 1.0f, false );
-		const float width = font.Width( s );
-		font.Paint( (SCREEN_WIDTH / 2) - (width / 2.0f), y + 45 + yOffset, s, &textColor, ITEM_TEXTSTYLE_SHADOWED );
+		const int fontHandle = FONT_SMALL;
+		const float fontScale = 1.0f;
+		const float width = Text_Width( s, fontScale, fontHandle, false );
+		Text_Paint( (SCREEN_WIDTH / 2) - (width / 2.0f), y + 45 + yOffset, fontScale, &textColor, s, 0.0f, 0,
+			ITEM_TEXTSTYLE_SHADOWED, fontHandle, false
+		);
 	}
 
 	trap->R_SetColor( NULL );

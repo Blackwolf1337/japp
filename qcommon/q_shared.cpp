@@ -79,26 +79,6 @@ int Q_bumpi( int min, int value ) {
 	return (value < min) ? min : value;
 }
 
-uint32_t Q_PoT( uint32_t i ) {
-	i--;
-	i |= i >>  1;
-	i |= i >>  2;
-	i |= i >>  4;
-	i |= i >>  8;
-	i |= i >> 16;
-	i++;
-
-	return i;
-}
-
-uint32_t Q_RoundToNextPoT( uint32_t value, uint32_t roundTo ) {
-	return (value + (roundTo - 1)) & ~(roundTo - 1);
-}
-
-uint32_t Q_RoundToNearMultipleDown( uint32_t value, uint32_t roundTo ) {
-	return std::floor( value / roundTo ) * roundTo;
-}
-
 char *COM_SkipPath( char *pathname ) {
 	char *last;
 
@@ -1454,13 +1434,14 @@ void Q_OpenURL( const char *url ) {
 #if defined(_WIN32)
 	ShellExecute( NULL, "open", url, NULL, NULL, SW_SHOWNORMAL );
 #elif defined(MACOS_X)
-	CFURLRef urlRef = CFURLCreateWithBytes( NULL, (UInt8 *)url, strlen( url ), kCFStringEncodingASCII, NULL );
-	LSOpenCFURLRef( urlRef, 0 );
+	CFURLRef urlRef = CFURLCreateWithBytes( NULL, (UInt8*)url, strlen( url ), kCFStringEncodingASCII, NULL );
+		LSOpenCFURLRef( urlRef, 0 );
 	CFRelease( urlRef );
 #elif defined(__linux__)
-	int ret = system( va( "xdg-open \"%s\"", url ) );
-	if ( ret != EXIT_SUCCESS ) {
-		trap->Print( "Could not open URL: %s\n", url );
-	}
+	#if defined(_DEBUG)
+	int ret =
+	#endif
+		system( va( "xdg-open \"%s\"", url ) );
+	assert( ret == 0 );
 #endif
 }

@@ -135,14 +135,14 @@ extern "C"
 	#define cJSON_AddStringToObject(object, name, s)		cJSON_AddItemToObject(object, name, cJSON_CreateString(s))
 
 	// Convenience functions: Add item to array
-	#define cJSON_AddNullToArray(arry)				cJSON_AddItemToArray(arry, cJSON_CreateNull())
-	#define cJSON_AddTrueToArray(arry)				cJSON_AddItemToArray(arry, cJSON_CreateTrue())
-	#define cJSON_AddFalseToArray(arry)				cJSON_AddItemToArray(arry, cJSON_CreateFalse())
-	#define cJSON_AddBooleanToArray(arry, b)		cJSON_AddItemToArray(arry, cJSON_CreateBoolean(b))
-	#define cJSON_AddIntegerToArray(arry, i)		cJSON_AddItemToArray(arry, cJSON_CreateInteger(i))
-	#define cJSON_AddLongIntegerToArray(arry, i)	cJSON_AddItemToArray(arry, cJSON_CreateLongInteger(i))
-	#define cJSON_AddNumberToArray(arry, n)			cJSON_AddItemToArray(arry, cJSON_CreateNumber(n))
-	#define cJSON_AddStringToArray(arry, s)			cJSON_AddItemToArray(arry, cJSON_CreateString(s))
+	#define cJSON_AddNullToArray(arry)						cJSON_AddItemToArray(arry, cJSON_CreateNull())
+	#define cJSON_AddTrueToArray(arry)						cJSON_AddItemToArray(arry, cJSON_CreateTrue())
+	#define cJSON_AddFalseToArray(arry)						cJSON_AddItemToArray(arry, cJSON_CreateFalse())
+	#define cJSON_AddBooleanToArray(arry, b)				cJSON_AddItemToArray(arry, cJSON_CreateBoolean(b))
+	#define cJSON_AddIntegerToArray(arry, i)				cJSON_AddItemToArray(arry, cJSON_CreateInteger(i))
+	#define cJSON_AddLongIntegerToArray(arry, i)			cJSON_AddItemToArray(arry, cJSON_CreateLongInteger(i))
+	#define cJSON_AddNumberToArray(arry, n)					cJSON_AddItemToArray(arry, cJSON_CreateNumber(n))
+	#define cJSON_AddStringToArray(arry, s)					cJSON_AddItemToArray(arry, cJSON_CreateString(s))
 
 	// Value types
 	extern int cJSON_IsNULL( cJSON *item );

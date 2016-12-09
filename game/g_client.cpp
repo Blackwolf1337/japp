@@ -2379,13 +2379,14 @@ const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 // called when a client has finished connecting, and is ready to be placed into the level
 // this will happen every level load, and on transition between teams, but doesn't happen on respawns
 void ClientBegin( int clientNum, qboolean allowTeamReset ) {
-	gentity_t *ent = g_entities + clientNum;
-	gentity_t *tent;
+	gentity_t *ent, *tent;
 	gclient_t *client;
 	uint32_t flags;
-	int spawnCount;
+	int i, spawnCount;
 	char userinfo[MAX_INFO_VALUE];
 	char modelname[MAX_QPATH];
+
+	ent = g_entities + clientNum;
 
 	if ( (ent->r.svFlags & SVF_BOT) && level.gametype >= GT_TEAM ) {
 		if ( allowTeamReset ) {
@@ -2462,17 +2463,19 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 	flags = client->ps.eFlags;
 	spawnCount = client->ps.persistant[PERS_SPAWN_COUNT];
 
-	for ( int i = 0; i < NUM_FORCE_POWERS; i++ ) {
+	i = 0;
+
+	while ( i < NUM_FORCE_POWERS ) {
 		if ( ent->client->ps.fd.forcePowersActive & (1 << i) ) {
 			WP_ForcePowerStop( ent, (forcePowers_t)i );
 		}
+		i++;
 	}
 
-	for ( int i = TRACK_CHANNEL_1; i < NUM_TRACK_CHANNELS; i++ ) {
-		if ( ent->client->ps.fd.killSoundEntIndex[i - 50]
-			&& ent->client->ps.fd.killSoundEntIndex[i - 50] < MAX_GENTITIES
-			&& ent->client->ps.fd.killSoundEntIndex[i - 50] > 0 )
-		{
+	i = TRACK_CHANNEL_1;
+
+	while ( i < NUM_TRACK_CHANNELS ) {
+		if ( ent->client->ps.fd.killSoundEntIndex[i - 50] && ent->client->ps.fd.killSoundEntIndex[i - 50] < MAX_GENTITIES && ent->client->ps.fd.killSoundEntIndex[i - 50] > 0 ) {
 			G_MuteSound( ent->client->ps.fd.killSoundEntIndex[i - 50], CHAN_VOICE );
 		}
 		i++;
@@ -3146,7 +3149,7 @@ void ClientSpawn( gentity_t *ent ) {
 
 	if ( level.gametype != GT_HOLOCRON
 		&& level.gametype != GT_JEDIMASTER
-		&& !BG_HasSetSaberOnly()
+		&& !HasSetSaberOnly()
 		&& !AllForceDisabled( g_forcePowerDisable.integer )
 		&& g_jediVmerc.integer )
 	{
@@ -3251,6 +3254,14 @@ void ClientSpawn( gentity_t *ent ) {
 				G_AddEvent( ent, EV_NOAMMO, wp );
 			}
 		}
+
+		for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++)
+		{
+			if (japp_spawnItems.bits & (1 << i)) {
+				ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << i);
+			}
+			client->ps.stats[STAT_HOLDABLE_ITEM] = (HI_NONE + 1);
+		}
 	}
 
 	else if ( client->siegeClass != -1 && client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -3311,8 +3322,17 @@ void ClientSpawn( gentity_t *ent ) {
 			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
 		}
 		else {
-			client->ps.stats[STAT_HOLDABLE_ITEMS] = japp_spawnItems.integer;
-			uint32_t x = client->ps.stats[STAT_HOLDABLE_ITEMS];
+			//ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = japp_spawnItems.integer;
+			
+
+			for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++) {
+				if (japp_spawnItems.bits & (1 << i)) {
+					ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << i);
+				}
+			}
+			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
+
+			/*uint32_t x = client->ps.stats[STAT_HOLDABLE_ITEMS];
 			// get the right-most bit
 			x &= -x;
 			// log2n of x is array index of bit-value
@@ -3326,7 +3346,7 @@ void ClientSpawn( gentity_t *ent ) {
 				? 3 : (x >= 100)
 				? 2 : (x >= 10)
 				? 1 : 0;
-			client->ps.stats[STAT_HOLDABLE_ITEM] = x;
+			client->ps.stats[STAT_HOLDABLE_ITEM] = x;*/
 		}
 	}
 
@@ -3585,6 +3605,9 @@ void ClientDisconnect( int clientNum ) {
 		AM_Logout( ent );
 	}
 
+	if ( ent->client->pers.clanpass ) {
+		*ent->client->pers.clanpass = '\0';
+	}
 
 	if ( !ent->client || ent->client->pers.connected == CON_DISCONNECTED ) {
 		G_LogPrintf( level.log.security, "ClientDisconnect: tried to disconnect an inactive client %i\n", clientNum );

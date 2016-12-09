@@ -384,24 +384,15 @@ static void CG_HudReload_f( void ) {
 }
 
 void CG_MessageModeAll_f( void ) {
-	if( cg_newChatbox.integer )
-		CG_ChatboxOpen( CHAT_ALL );
-	else
-		trap->SendConsoleCommand( "messagemode" );
+	CG_ChatboxOpen( CHAT_ALL );
 }
 
 void CG_MessageModeTeam_f( void ) {
-	if( cg_newChatbox.integer )
-		CG_ChatboxOpen( CHAT_TEAM );
-	else
-		trap->SendConsoleCommand( "messagemode2" );
+	CG_ChatboxOpen( CHAT_TEAM );
 }
 
 void CG_MessageModeTell_f( void ) {
-	if( cg_newChatbox.integer )
-		CG_ChatboxOpen( CHAT_WHISPER );
-	else
-		trap->SendConsoleCommand( "messagemode3" );
+	CG_ChatboxOpen( CHAT_WHISPER );
 }
 
 typedef struct command_s {
@@ -425,7 +416,6 @@ static const command_t commands[] = {
 #if !defined(NO_CRASHHANDLER) && !defined(MACOS_X)
 	{ "crash", CG_Crash_f },
 #endif
-	{ "engage_fullforceduel", NULL },
 	{ "engage_duel", NULL },
 	{ "follow", NULL },
 	{ "forcechanged", NULL },

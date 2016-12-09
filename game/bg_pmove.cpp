@@ -3153,7 +3153,7 @@ static void PM_GrappleMove( void ) {
 	VectorCopy( &vel, &pm->ps->velocity );
 
 	pml.groundPlane = qfalse;
-
+	
 	VectorSet(&facingAngles, 0, pm->ps->viewangles.yaw, 0);
 
 	AngleVectors(&facingAngles, &facingFwd, &facingRight, NULL);
@@ -5746,8 +5746,7 @@ static qboolean PM_DoChargedWeapons( qboolean vehicleRocketLock, bgEntity_t *veh
 			else if ( (pm->cmd.serverTime - pm->ps->weaponChargeTime) < weaponData[pm->ps->weapon].alt.chargeMax ) {
 				if ( pm->ps->weaponChargeSubtractTime < pm->cmd.serverTime ) {
 #ifdef PROJECT_GAME
-					if ( !( ((gentity_t *)pm_entSelf)->client->pers.adminData.merc && japp_mercInfiniteAmmo.integer ) ||
-						 !((gentity_t *)pm_entSelf)->client->ps.duelInProgress )
+					if ( !((gentity_t *)pm_entSelf)->client->pers.adminData.merc || !japp_mercInfiniteAmmo.integer )
 #endif
 						pm->ps->ammo[weaponData[pm->ps->weapon].ammoIndex] -= weaponData[pm->ps->weapon].alt.charge;
 					pm->ps->weaponChargeSubtractTime = pm->cmd.serverTime + weaponData[pm->ps->weapon].alt.chargeTime;
@@ -5781,8 +5780,7 @@ static qboolean PM_DoChargedWeapons( qboolean vehicleRocketLock, bgEntity_t *veh
 			else if ( (pm->cmd.serverTime - pm->ps->weaponChargeTime) < weaponData[pm->ps->weapon].chargeMax ) {
 				if ( pm->ps->weaponChargeSubtractTime < pm->cmd.serverTime ) {
 #ifdef PROJECT_GAME
-					if (!(((gentity_t *)pm_entSelf)->client->pers.adminData.merc && japp_mercInfiniteAmmo.integer) ||
-						!((gentity_t *)pm_entSelf)->client->ps.duelInProgress)
+					if ( !((gentity_t *)pm_entSelf)->client->pers.adminData.merc || !japp_mercInfiniteAmmo.integer )
 #endif
 						pm->ps->ammo[weaponData[pm->ps->weapon].ammoIndex] -= weaponData[pm->ps->weapon].charge;
 					pm->ps->weaponChargeSubtractTime = pm->cmd.serverTime + weaponData[pm->ps->weapon].chargeTime;
@@ -10009,7 +10007,7 @@ void PmoveSingle( pmove_t *pmove ) {
 
 	if ( pm->cmd.forcesel != (byte)-1
 		&& (pm->ps->fd.forcePowersKnown & (1 << pm->cmd.forcesel))
-		&& pm->cmd.forcesel != FP_LEVITATION
+		/*&& pm->cmd.forcesel != FP_LEVITATION*/
 		&& pm->cmd.forcesel < NUM_FORCE_POWERS )
 	{
 		pm->ps->fd.forcePowerSelected = pm->cmd.forcesel;

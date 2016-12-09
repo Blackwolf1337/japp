@@ -16,8 +16,6 @@ extern "C" {
 namespace JPLua {
 
 	#define JPLUA_EXTENSION ".lua"
-	extern const char *pluginDir;
-	extern const char *baseDir;
 
 	extern struct luaState_t {
 		bool initialised;

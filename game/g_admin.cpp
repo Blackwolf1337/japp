@@ -500,9 +500,9 @@ void AM_AddAdmin( const char *user, const char *pass, uint64_t privileges, const
 
 void AM_RegisterAccount(gentity_t *ent, const char *user, const char *pass, const char *email) {
 	adminUser_t	*admin = NULL;
-	gentity_t *e;
-	uint64_t privileges = 2478196129793;
-	const int rank = 0;
+	gentity_t *e;			 //  | FIX: wolf
+	uint64_t privileges = 0; //<-| Can't make a cvar for it :C, cvar size is int32_t i need atleast int64_t...
+	const int rank = 0;		 //  | Probably workaround with splitting up the integers.
 	const char *loginMsg = va("^2[^7REGISTERED^2] ^7%s has logged in.", user);;
 	int effect = 0;
 	int size = 1;
@@ -1203,6 +1203,12 @@ static void AM_Login( gentity_t *ent ) {
 void AM_Logout( gentity_t *ent ) {
 	gentity_t *e;
 	int i;
+
+	if (!ent->client->pers.adminUser)
+	{
+		trap->SendServerCommand(ent - g_entities, "print \"Not logged in.\n\"");
+		return;
+	}
 
 	G_LogPrintf( level.log.admin, "[LOGOUT] \"%s\", %s\n", ent->client->pers.adminUser->user,
 		G_PrintClient( ent-g_entities ) );
@@ -5132,6 +5138,7 @@ typedef struct adminCommand_s {
 static const adminCommand_t adminCommands[] = {
 	// these must be in alphabetical order for the binary search to work
 	//	{ "amlogin", -1, AM_Login }, // log in using user + pass (handled explicitly!!!)
+	//  { "amlogout", 0xFFFFFFFFu, AM_Logout }, // logout
 	{ "administrate", PRIV_EDIT, AM_Administrate }, // Manage accounts
 	{ "amanim", PRIV_ANIM, AM_Anim }, // Play Custom Animations
 	{ "amban", PRIV_BAN, AM_Ban }, // ban specified client (client + duration + reason)
@@ -5157,7 +5164,6 @@ static const adminCommand_t adminCommands[] = {
 	{ "amlightning", PRIV_POWERS, AM_Lightning }, // Lightning
 	{ "amlisttele", PRIV_TELEPORT, AM_ListTelemarks }, // list all marked positions
 	{ "amlockteam", PRIV_LOCKTEAM, AM_LockTeam }, // prevent clients from joining a team
-	{ "amlogout", 0xFFFFFFFFu, AM_Logout }, // logout
 	{ "amluaexec", PRIV_LUA, AM_Lua }, // execute Lua code
 	{ "amluareload", PRIV_LUA, AM_ReloadLua }, // reload JPLua system
 	{ "ammap", PRIV_MAP, AM_Map }, // change map and gamemode
@@ -5320,6 +5326,11 @@ qboolean AM_HandleCommands( gentity_t *ent, const char *cmd ) {
 
 	if ( !Q_stricmp( cmd, "amlogin" ) ) {
 		AM_Login( ent );
+		return qtrue;
+	}
+
+	if (!Q_stricmp( cmd, "amlogout") ) {
+		AM_Logout( ent );
 		return qtrue;
 	}
 

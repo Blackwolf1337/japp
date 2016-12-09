@@ -159,20 +159,20 @@ void WP_InitForcePowers( gentity_t *ent ) {
 	if ( g_forceBasedTeams.integer ) {
 		if ( ent->client->sess.sessionTeam == TEAM_RED ) {
 			warnClient = !BG_LegalizedForcePowers( forcePowers, sizeof(forcePowers), g_maxForceRank.integer,
-				BG_HasSetSaberOnly(), FORCESIDE_DARK, level.gametype, g_forcePowerDisable.integer );
+				HasSetSaberOnly(), FORCESIDE_DARK, level.gametype, g_forcePowerDisable.integer );
 		}
 		else if ( ent->client->sess.sessionTeam == TEAM_BLUE ) {
 			warnClient = !BG_LegalizedForcePowers( forcePowers, sizeof(forcePowers), g_maxForceRank.integer,
-				BG_HasSetSaberOnly(), FORCESIDE_LIGHT, level.gametype, g_forcePowerDisable.integer );
+				HasSetSaberOnly(), FORCESIDE_LIGHT, level.gametype, g_forcePowerDisable.integer );
 		}
 		else {
 			warnClient = !BG_LegalizedForcePowers( forcePowers, sizeof(forcePowers), g_maxForceRank.integer,
-				BG_HasSetSaberOnly(), FORCESIDE_NEUTRAL, level.gametype, g_forcePowerDisable.integer );
+				HasSetSaberOnly(), FORCESIDE_NEUTRAL, level.gametype, g_forcePowerDisable.integer );
 		}
 	}
 	else {
 		warnClient = !BG_LegalizedForcePowers( forcePowers, sizeof(forcePowers), g_maxForceRank.integer,
-			BG_HasSetSaberOnly(), FORCESIDE_NEUTRAL, level.gametype, g_forcePowerDisable.integer );
+			HasSetSaberOnly(), FORCESIDE_NEUTRAL, level.gametype, g_forcePowerDisable.integer );
 	}
 
 	// forcepowers string is valid, parse it out
@@ -189,7 +189,7 @@ void WP_InitForcePowers( gentity_t *ent ) {
 	}
 
 	if ( ent->s.eType != ET_NPC ) {
-		if ( BG_HasSetSaberOnly() ) {
+		if ( HasSetSaberOnly() ) {
 			gentity_t *te = G_TempEntity( &vec3_origin, EV_SET_FREE_SABER );
 			te->r.svFlags |= SVF_BROADCAST;
 			te->s.eventParm = 1;
@@ -331,7 +331,7 @@ void WP_SpawnInitForcePowers( gentity_t *ent ) {
 		for ( i = 0; i < NUM_FORCE_POWERS; i++ )
 			ent->client->ps.fd.forcePowerLevel[i] = FORCE_LEVEL_0;
 
-		if ( BG_HasSetSaberOnly() ) {
+		if ( HasSetSaberOnly() ) {
 			if ( ent->client->ps.fd.forcePowerLevel[FP_SABER_OFFENSE] < FORCE_LEVEL_1 )
 				ent->client->ps.fd.forcePowerLevel[FP_SABER_OFFENSE] = FORCE_LEVEL_1;
 			if ( ent->client->ps.fd.forcePowerLevel[FP_SABER_DEFENSE] < FORCE_LEVEL_1 )
@@ -388,6 +388,11 @@ int ForcePowerUsableOn( gentity_t *attacker, gentity_t *other, forcePowers_t for
 	}
 
 	//Dueling fighters cannot use force powers on others, with the exception of force push when locked with each other
+
+	if (other->client->ps.duelIndex == attacker->s.number){
+		return 1;
+	}
+
 	if ( attacker && attacker->client && attacker->client->ps.duelInProgress ) {
 		return 0;
 	}
@@ -3822,7 +3827,7 @@ void HolocronUpdate( gentity_t *self ) { //keep holocron status updated in holoc
 		i++;
 	}
 
-	if ( BG_HasSetSaberOnly() ) { //if saberonly, we get these powers no matter what (still need the holocrons for level 3)
+	if ( HasSetSaberOnly() ) { //if saberonly, we get these powers no matter what (still need the holocrons for level 3)
 		if ( self->client->ps.fd.forcePowerLevel[FP_SABER_OFFENSE] < FORCE_LEVEL_1 )
 			self->client->ps.fd.forcePowerLevel[FP_SABER_OFFENSE] = FORCE_LEVEL_1;
 		if ( self->client->ps.fd.forcePowerLevel[FP_SABER_DEFENSE] < FORCE_LEVEL_1 )

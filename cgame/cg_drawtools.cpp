@@ -5,7 +5,6 @@
 #include "qcommon/q_shared.h"
 #include "cg_media.h"
 #include "ui/ui_shared.h"	// for some text style junk
-#include "ui/ui_fonts.h"
 
 // Coordinates are 640*480 virtual values
 void CG_DrawRect( float x, float y, float width, float height, float size, const vector4 *color ) {
@@ -125,13 +124,20 @@ void CG_DrawChar( int x, int y, int width, int height, int ch ) {
 // Coordinates are at 640 by 480 virtual resolution
 void CG_DrawStringExt( int x, int y, const char *string, const vector4 *setColor,
 	qboolean forceColor, qboolean shadow, int charWidth, int charHeight, int maxChars ) {
-	const Font font( FONT_MEDIUM, 1.0f, false );
 	if ( trap->R_Language_IsAsian() ) {
 		// hack-a-doodle-do (post-release quick fix code)...
 		//
 		vector4 color;
 		memcpy( &color, setColor, sizeof(color) );	// de-const it
-		font.Paint( x, y, string, &color, shadow ? ITEM_TEXTSTYLE_SHADOWED : 0 );
+		Text_Paint( x, y, 1.0f,	// float scale,
+			&color,		// vector4 color,
+			string,		// const char *text,
+			0.0f,		// float adjust,
+			0,			// int limit,
+			shadow ? ITEM_TEXTSTYLE_SHADOWED : 0,	// int style,
+			FONT_MEDIUM, // iMenuFont
+			qfalse
+			);
 	}
 	else {
 		vector4		color;

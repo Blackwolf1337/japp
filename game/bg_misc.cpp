@@ -380,10 +380,7 @@ void BG_ParseField( const BG_field_t *l_fields, int numFields, const char *key, 
 				((float *)(b + f->ofs))[2] = vec.z;
 			}
 			else {
-				Com_Printf(
-					"BG_ParseField(%s): F_VECTOR (%s:%s) with incorrect amount of arguments. Using null vector\n",
-					f->name, key, value
-				);
+				Com_Printf( "BG_ParseField(%s): F_VECTOR (%s:%s) with incorrect amount of arguments. Using null vector\n", f->name, key, value );
 				((float *)(b + f->ofs))[0] = ((float *)(b + f->ofs))[1] = ((float *)(b + f->ofs))[2] = 0.0f;
 			}
 			break;
@@ -767,7 +764,12 @@ qboolean BG_CanUseFPNow( int gametype, playerState_t *ps, int time, forcePowers_
 		return qfalse;
 	}
 
-	if ( ps->duelInProgress ) {
+#ifdef PROJECT_GAME
+	if (ps->duelInProgress && !(g_privateDuel.bits & PRIVDUEL_FULLFORCE)) {
+#endif
+#ifndef PROJECT_GAME
+		if (ps->duelInProgress) {
+#endif // !PROJECT_GAME
 		if ( power != FP_SABER_OFFENSE && power != FP_SABER_DEFENSE && /*power != FP_SABERTHROW &&*/
 			power != FP_LEVITATION ) {
 			if ( !ps->saberLockFrame || power != FP_PUSH ) {
@@ -2142,47 +2144,4 @@ team_t BG_GetOpposingTeam( team_t team ) {
 	else {
 		return team;
 	}
-}
-
-#if defined(PROJECT_GAME)
-bool BG_HasSetSaberOnly( void )
-#elif defined(PROJECT_CGAME) || defined(PROJECT_UI)
-bool BG_HasSetSaberOnly( const char *info )
-#endif
-{
-#if defined(PROJECT_GAME)
-	const int gametype = level.gametype;
-#elif defined(PROJECT_CGAME)
-	const int gametype = cgs.gametype;
-#elif defined(PROJECT_UI)
-	const int gametype = ui_gameType.integer;
-#endif
-
-	if ( gametype == GT_JEDIMASTER ) {
-		return false;
-	}
-
-	const uint32_t weaponDisable = (gametype == GT_DUEL || gametype == GT_POWERDUEL)
-#if defined(PROJECT_GAME)
-		? g_duelWeaponDisable.integer
-		: g_weaponDisable.integer;
-#elif defined(PROJECT_CGAME) || defined(PROJECT_UI)
-		? atoi( Info_ValueForKey( info, "g_duelWeaponDisable" ) )
-		: atoi( Info_ValueForKey( info, "g_weaponDisable" ) );
-#endif
-
-	for ( int wp = WP_NONE; wp < WP_NUM_WEAPONS; wp++ ) {
-		if ( !(weaponDisable & (1 << wp))
-			&& wp != WP_NONE
-			&& wp != WP_STUN_BATON
-			&& wp != WP_MELEE
-			&& wp != WP_SABER
-			&& wp != WP_EMPLACED_GUN
-			&& wp != WP_TURRET )
-		{
-			return false;
-		}
-	}
-
-	return true;
 }

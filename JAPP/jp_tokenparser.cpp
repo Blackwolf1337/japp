@@ -179,7 +179,9 @@ qboolean TP_ParseFloat( float *f ) {
 }
 
 qboolean TP_ParseVec3( vector3 *vec ) {
-	for ( int i = 0; i < 3; i++ ) {
+	int i;
+
+	for ( i = 0; i < 3; i++ ) {
 		const char *token = TP_ParseExt( qfalse );
 
 		if ( *token == '\0' ) {
@@ -193,7 +195,9 @@ qboolean TP_ParseVec3( vector3 *vec ) {
 }
 
 qboolean TP_ParseVec4( vector4 *vec ) {
-	for ( int i = 0; i < 4; i++ ) {
+	int i;
+
+	for ( i = 0; i < 4; i++ ) {
 		const char *token = TP_ParseExt( qfalse );
 		if ( *token == '\0' ) {
 			return qtrue;

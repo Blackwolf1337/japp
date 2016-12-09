@@ -1,6 +1,5 @@
 #include "cg_local.h"
 #include "bg_luainternal.h"
-#include "ui/ui_fonts.h"
 
 #ifdef JPLUA
 
@@ -12,10 +11,9 @@ namespace JPLua {
 		if ( box->recalculate ) {
 			const bool customFont = box->font != nullptr;
 			const int fontHandle = customFont ? box->font->index : FONT_MEDIUM;
-			const Font font( fontHandle, box->scale, customFont );
 
-			box->width = font.Width( box->text.c_str() );
-			box->height = font.Height( box->text.c_str() );
+			box->width = Text_Width( box->text.c_str(), box->scale, fontHandle, customFont );
+			box->height = Text_Height( box->text.c_str(), box->scale, fontHandle, customFont );
 
 			box->recalculate = false;
 		}
@@ -291,7 +289,6 @@ namespace JPLua {
 		float y = luaL_checknumber( L, 3 );
 		bool customFont = box->font != nullptr;
 		int fontHandle = customFont ? box->font->index : FONT_MEDIUM;
-		const Font font( fontHandle, box->scale, customFont );
 		const char *text = box->text.c_str();
 
 		if ( box->centered ) {
@@ -299,7 +296,7 @@ namespace JPLua {
 			//y -= box->height / 2.0f;
 		}
 
-		font.Paint( x, y, text, &box->colour, box->style );
+		Text_Paint( x, y, box->scale, &box->colour, text, 0.0f, 0, box->style, fontHandle, customFont );
 		return 0;
 	}
 

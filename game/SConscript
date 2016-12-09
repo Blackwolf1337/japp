@@ -182,10 +182,6 @@ if plat == 'Windows':
 			'Psapi',
 			'user32',
 		]
-elif plat == 'Linux':
-	game_env['LIBS'] += [
-		'pthread',
-	]
 
 # project settings
 game_env['CPPPATH'] += [

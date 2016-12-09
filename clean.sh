@@ -5,14 +5,9 @@ ARGS=($@)
 ARGSLEN=${#ARGS[@]}
 
 # options
-PROJECT=game,cgame,ui
-TOOLS=default
 DEBUG=0
 FORCE32=0
-NOSQL=1
-export NO_SSE=1
-
-clean='scons -Qc'
+clean='scons -Q'
 
 for (( i=0; i<${ARGSLEN}; i++ ));
 do
@@ -26,15 +21,12 @@ do
 	"force32")
 		FORCE32=1
 		;;
-	"nosql")
-		NOSQL=1
-		;;
 	*)
 		;;
 	esac
 done
 
-$clean debug=$DEBUG force32=$FORCE32 no_sql=$NOSQL project=$PROJECT tools=$TOOLS
+$clean debug=$DEBUG force32=$FORCE32 -c
 
 # remove any lingering object files
 find . -type f -name "*.os" -delete

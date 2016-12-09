@@ -1269,7 +1269,7 @@ void HolocronTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 		other->client->ps.holocronsCarried[index_lowest] = 0;
 
 		/*
-		if (index_lowest == FP_SABER_OFFENSE && !BG_HasSetSaberOnly())
+		if (index_lowest == FP_SABER_OFFENSE && !HasSetSaberOnly())
 		{ //you lost your saberattack holocron, so no more saber for you
 		other->client->ps.stats[STAT_WEAPONS] |= (1 << WP_STUN_BATON);
 		other->client->ps.stats[STAT_WEAPONS] &= ~(1 << WP_SABER);
@@ -1294,7 +1294,7 @@ void HolocronTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	self->pos2.y = level.time + HOLOCRON_RESPAWN_TIME;
 
 	/*
-	if (self->count == FP_SABER_OFFENSE && !BG_HasSetSaberOnly())
+	if (self->count == FP_SABER_OFFENSE && !HasSetSaberOnly())
 	{ //player gets a saber
 	other->client->ps.stats[STAT_WEAPONS] |= (1 << WP_SABER);
 	other->client->ps.stats[STAT_WEAPONS] &= ~(1 << WP_STUN_BATON);
@@ -1396,7 +1396,7 @@ void SP_misc_holocron( gentity_t *ent ) {
 		return;
 	}
 
-	if ( BG_HasSetSaberOnly() ) {
+	if ( HasSetSaberOnly() ) {
 		if ( ent->count == FP_SABER_OFFENSE ||
 			ent->count == FP_SABER_DEFENSE ||
 			ent->count == FP_SABERTHROW ) { //having saber holocrons in saber only mode is pointless
@@ -2476,7 +2476,7 @@ void SP_fx_runner( gentity_t *ent ) {
 	G_SpawnFloat( "random", "0", &ent->random );
 	G_SpawnInt( "splashRadius", "16", &ent->splashRadius );
 	G_SpawnInt( "splashDamage", "5", &ent->splashDamage );
-
+	
 	//Raz: Hackhackhack for fx_runners
 	if ( ent->fullName )
 		fxFile = ent->fullName;

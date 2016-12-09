@@ -5,7 +5,6 @@
 #include "bg_luaevent.h"
 #include "cg_media.h"
 #include "ui/ui_shared.h"
-#include "ui/ui_fonts.h"
 
 // qcommon.h
 #define	MAX_EDIT_LINE 256
@@ -316,14 +315,14 @@ void CG_ChatboxAddMessage( const char *message, qboolean multiLine, const char *
 	chatEntry_t *chat = &cb->chatBuffer[MAX_CHATBOX_ENTRIES - 1];
 	int strLength = 0;
 	int i = 0;
-
 	float accumLength = 0.0f;
 	char buf[CHAT_MESSAGE_LENGTH] = { 0 };
 	struct tm *timeinfo;
 	time_t tm;
-	const Font font( CG_GetChatboxFont(), cg.chatbox.size.scale );
 
-	accumLength = cg_chatboxTimeShow.integer ? font.Width( EXAMPLE_TIMESTAMP_CLEAN ) : 0.0f;
+	accumLength = cg_chatboxTimeShow.integer
+		? Text_Width( EXAMPLE_TIMESTAMP_CLEAN, cg.chatbox.size.scale, CG_GetChatboxFont(), false )
+		: 0.0f;
 
 	cb->numActiveLines++;
 
@@ -342,7 +341,7 @@ void CG_ChatboxAddMessage( const char *message, qboolean multiLine, const char *
 		char *p = (char*)&message[i];
 		Com_sprintf( buf, sizeof(buf), "%c", *p );
 		if ( !Q_IsColorString( p ) && (i > 0 && !Q_IsColorString( p - 1 )) ) {
-			accumLength += font.Width( buf );
+			accumLength += Text_Width( buf, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 		}
 
 		if ( accumLength > std::max( cg.chatbox.size.width, 128 ) && (i > 0 && !Q_IsColorString( p - 1 )) ) {
@@ -467,12 +466,11 @@ void CG_ChatboxAddMessage( const char *message, qboolean multiLine, const char *
 static void CG_ChatboxDrawTabs( void ) {
 	chatBox_t *cb = chatboxList;
 	float xOffset = 0.0f;
-	const Font font( CG_GetChatboxFont(), cg.chatbox.size.scale, false );
 
 	while ( cb ) {
 		const char *name = cb->shortname;
-		float textWidth = font.Width( name );
-		float textHeight = font.Height( name );
+		float textWidth = Text_Width( name, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+		float textHeight = Text_Height( name, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 
 		CG_FillRect(
 			cg.chatbox.pos.x + cg.chatbox.size.width - textWidth - 16.0f - xOffset,
@@ -492,12 +490,13 @@ static void CG_ChatboxDrawTabs( void ) {
 				nameColour = COLOR_RED;
 			}
 		}
-		font.Paint(
+		Text_Paint(
 			cg.chatbox.pos.x + cg.chatbox.size.width - textWidth - 8.0f - xOffset,
 			cg.chatbox.pos.y + chatboxHeight + textHeight,
-			va( "^%c%s", nameColour, cb->shortname ),
+			cg.chatbox.size.scale,
 			&colorWhite,
-			ITEM_TEXTSTYLE_OUTLINED
+			va( "^%c%s", nameColour, cb->shortname ),
+			0.0f, 0, ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(), false
 		);
 
 		xOffset += textWidth + 16.0f;
@@ -563,13 +562,12 @@ void CG_ChatboxDraw( void ) {
 	const char *scrollMsg = va( S_COLOR_YELLOW "Scrolled lines: " S_COLOR_CYAN "%i\n",
 		currentChatbox->scrollAmount * -1
 	);
-	const Font font( CG_GetChatboxFont(), cg.chatbox.size.scale, false );
-	float height = font.Height( scrollMsg );
+	float height = Text_Height( scrollMsg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 
 	if ( !skipDraw && currentChatbox->scrollAmount < 0 && CG_ChatboxActive() ) {
-		font.Paint(
+		Text_Paint(
 			cg.chatbox.pos.x, cg.chatbox.pos.y + yAccum - (height / 2.0f),
-			scrollMsg, &colorWhite, ITEM_TEXTSTYLE_OUTLINED
+			cg.chatbox.size.scale, &colorWhite, scrollMsg, 0.0f, 0, ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(), false
 		);
 	}
 	yAccum += height;
@@ -583,8 +581,8 @@ void CG_ChatboxDraw( void ) {
 			chatEntry_t *chat = &currentChatbox->chatBuffer[i];
 			if ( chat->isUsed ) {
 				const char *msg = va( "%s%s", (cg_chatboxTimeShow.integer ? chat->timeStamp : ""), chat->message );
-				chatboxHeight += font.Height( msg );
-				float tmp = font.Width( msg );
+				chatboxHeight += Text_Height( msg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+				float tmp = Text_Width( msg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 				if ( tmp > chatboxWidth ) {
 					chatboxWidth = tmp;
 				}
@@ -629,11 +627,12 @@ void CG_ChatboxDraw( void ) {
 					const char *tmp = va( "%s%s", (cg_chatboxTimeShow.integer ? chat->timeStamp : ""), chat->message );
 
 					// retrieve any stored URL positions
-					const float height = font.Height( tmp );
-					//const float width = font.Width( tmp );
-					font.Paint(
+					const float height = Text_Height( tmp, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+					//const float width = Text_Width( tmp, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+					Text_Paint(
 						cg.chatbox.pos.x, cg.chatbox.pos.y + yAccum - (height / 2.0f),
-						tmp, &colorWhite, ITEM_TEXTSTYLE_OUTLINED
+						cg.chatbox.size.scale, &colorWhite, tmp, 0.0f, 0, ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(),
+						false
 					);
 					const size_t timestampLength = cg_chatboxTimeShow.integer ? strlen( chat->timeStamp ) : 0u;
 					for ( chatEntry_t::urlLocation *url = chat->URLs; url; url = url->next ) {
@@ -642,16 +641,16 @@ void CG_ChatboxDraw( void ) {
 
 						//FIXME: somehow this isn't accurate when using r_aspectCorrectFonts?!
 						url->pos.x = cg.chatbox.pos.x
-							+ font.Width( scratch );
+							+ Text_Width( scratch, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 
 						Q_strncpyz( scratch, tmp + url->start + timestampLength, url->length );
-						url->size.x = font.Width( scratch );
+						url->size.x = Text_Width( scratch, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 
 						url->pos.y = cg.chatbox.pos.y + yAccum - (height / 2.0f);
 						url->size.y = height;
 
-						font.Paint(
-							url->pos.x, url->pos.y, scratch, &colorTable[CT_LTBLUE2], ITEM_TEXTSTYLE_OUTLINED
+						Text_Paint( url->pos.x, url->pos.y, cg.chatbox.size.scale, &colorTable[CT_LTBLUE2], scratch,
+							0.0f, 0, ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(), false
 						);
 						CG_FillRect( url->pos.x, url->pos.y + height + 2.0f, url->size.x, 1.0f, &colorTable[CT_LTBLUE2] );
 					}
@@ -669,25 +668,24 @@ void CG_ChatboxDraw( void ) {
 		const char *cleanPre = GetPreText( qtrue );
 		char msg[MAX_EDIT_LINE];
 		Com_sprintf( msg, sizeof(msg), pre, va( S_COLOR_ESCAPE "%c%s", GetChatColour(), chatField.buffer ) );
-		const float height = font.Height( msg );
+		const float height = Text_Height( msg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 		inputLineHeight = height;
-		inputLineWidth = font.Width( msg );
-		font.Paint(
-			cg.chatbox.pos.x, cg.chatbox.pos.y + yAccum - (height / 2.0f), msg,
-			&g_color_table[ColorIndex( COLOR_WHITE )], ITEM_TEXTSTYLE_OUTLINED
+		inputLineWidth = Text_Width( msg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+		Text_Paint( cg.chatbox.pos.x, cg.chatbox.pos.y + yAccum - (height / 2.0f), cg.chatbox.size.scale,
+			&g_color_table[ColorIndex( COLOR_WHITE )], msg, 0.0f, 0, ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(), false
 		);
 		if ( (trap->Milliseconds() >> 8) & 1 ) {
-			const float cursorPre = font.Width( cleanPre );
+			const float cursorPre = Text_Width( cleanPre, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 			float cursorOffset = 0.0f;
 
 			Q_CleanString( msg, STRIP_COLOUR );
 			for ( j = 0; j < chatField.cursor; j++ ) {
-				cursorOffset += font.Width( va( "%c", msg[j] ) );
+				cursorOffset += Text_Width( va( "%c", msg[j] ), cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 			}
 
 			const char *cursorChar = overstrike ? "#" : "|";
-			const float cursorWidth = font.Width( cursorChar );
-			const float cursorHeight = font.Height( cursorChar );
+			const float cursorWidth = Text_Width( cursorChar, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
+			const float cursorHeight = Text_Height( cursorChar, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 			if ( !overstrike ) {
 				cursorOffset -= cursorWidth / 2.0f;
 			}
@@ -698,9 +696,10 @@ void CG_ChatboxDraw( void ) {
 				);
 			}
 			else {
-				font.Paint(
+				Text_Paint(
 					cg.chatbox.pos.x + cursorPre + cursorOffset, cg.chatbox.pos.y + yAccum - (cursorHeight / 2.0f),
-					cursorChar, &g_color_table[ColorIndex( COLOR_WHITE )], ITEM_TEXTSTYLE_OUTLINED
+					cg.chatbox.size.scale, &g_color_table[ColorIndex( COLOR_WHITE )], cursorChar, 0.0f, 0,
+					ITEM_TEXTSTYLE_OUTLINED, CG_GetChatboxFont(), false
 				);
 			}
 		}
@@ -1061,13 +1060,12 @@ static void Field_CharEvent( field_t *edit, int key ) {
 				bool cursorSet = false;
 				char savedChar;
 				size_t i = bias + 1u;
-				const Font font( CG_GetChatboxFont(), cg.chatbox.size.scale, false );
 				do {
 					savedChar = msg[i];
 					msg[i] = '\0';
 					edit->cursor = i - bias - 1;
 					//TODO: drag-selection
-					float width = font.Width( msg );
+					float width = Text_Width( msg, cg.chatbox.size.scale, CG_GetChatboxFont(), false );
 					if ( cgs.cursorX < cg.chatbox.pos.x + width ) {
 						cursorSet = true;
 						break;

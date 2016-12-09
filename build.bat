@@ -2,6 +2,5 @@
 
 for %%X in (scons.bat, lua.exe) do (IF EXIST %%~$PATH:X echo Found %%X at %%~$PATH:X)
 
-SET NO_SSE=1
-scons -Q debug=1 force32=1 no_sql=1 tools=default
+scons -Q debug=0 force32=1 no_sql=1
 @rem lua package.lua

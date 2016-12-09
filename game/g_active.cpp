@@ -1834,9 +1834,8 @@ void ClientThink_real( gentity_t *ent ) {
 	}
 
 	//OSP: pause
-	if ( level.pause.state != PAUSE_NONE || level.forcedRespawnTime != 0 ) {
-		ucmd->buttons &= BUTTON_TALK; // only talk allowed
-		ucmd->generic_cmd = 0;
+	if ( level.pause.state != PAUSE_NONE ) {
+		ucmd->buttons = ucmd->generic_cmd = 0;
 		ucmd->forwardmove = ucmd->rightmove = ucmd->upmove = 0;
 		client->ps.pm_type = PM_FREEZE;
 	}
@@ -2205,26 +2204,16 @@ void ClientThink_real( gentity_t *ent ) {
 				const char *loser = duelAgainst->client->pers.netname;
 
 				// x has defeated y
-				Com_sprintf( pre1, sizeof(pre1),
-					"%s " S_COLOR_WHITE "%s %s", winner, defeated, loser
-				);
-				Com_sprintf( pre2, sizeof(pre2),
-					"You %s %s", defeated, loser
-				);
+				Com_sprintf( pre1, sizeof(pre1), "%s " S_COLOR_WHITE "%s %s", winner, defeated, loser );
+				Com_sprintf( pre2, sizeof(pre2), "You %s %s", defeated, loser );
 
 				// with h/a remaining
 				if ( japp_duelStats.bits & DUELSTATS_HEALTH ) {
 					const int health = ent->client->ps.stats[STAT_HEALTH];
 					const int armor = ent->client->ps.stats[STAT_ARMOR];
 
-					Q_strcat( buf, sizeof(buf),
-						va(
-							" " S_COLOR_WHITE "with " S_COLOR_RED "%i" S_COLOR_WHITE "/" S_COLOR_GREEN "%i "
-								S_COLOR_WHITE "remaining",
-							health,
-							armor
-						)
-					);
+					Q_strcat( buf, sizeof(buf), va( " " S_COLOR_WHITE "with " S_COLOR_RED "%i" S_COLOR_WHITE "/"
+						S_COLOR_GREEN "%i " S_COLOR_WHITE "remaining", health, armor ) );
 				}
 
 				// in xx:xx
@@ -2235,17 +2224,15 @@ void ClientThink_real( gentity_t *ent ) {
 
 					secs %= 60;
 
-					Q_strcat( buf, sizeof(buf),
-						va( " " S_COLOR_WHITE "in " S_COLOR_CYAN "%i" S_COLOR_WHITE ":" S_COLOR_CYAN "%02i", mins, secs )
-					);
+					Q_strcat( buf, sizeof(buf), va( " " S_COLOR_WHITE "in " S_COLOR_CYAN "%i" S_COLOR_WHITE ":"
+						S_COLOR_CYAN "%02i", mins, secs ) );
 				}
 
 				// with y hits
 				if ( japp_duelStats.bits & DUELSTATS_HITS ) {
 					const int hits = ent->duelHitCount;
-					Q_strcat( buf, sizeof(buf),
-						va( " " S_COLOR_WHITE "with " S_COLOR_YELLOW "%i" S_COLOR_WHITE " hits", hits )
-					);
+					Q_strcat( buf, sizeof(buf), va( " " S_COLOR_WHITE "with " S_COLOR_YELLOW "%i" S_COLOR_WHITE " hits",
+						hits ) );
 				}
 
 				trap->SendServerCommand( -1, va( "print \"%s%s\n\"", pre1, buf ) );
@@ -2254,15 +2241,9 @@ void ClientThink_real( gentity_t *ent ) {
 
 			else {
 				// it was a draw, because we both managed to die in the same frame
-				trap->SendServerCommand( -1,
-					va(
-						"print \"%s: %s " S_COLOR_WHITE "vs %s! " S_COLOR_WHITE "(" S_COLOR_RED "%i" S_COLOR_WHITE "/"
-							S_COLOR_GREEN "%i" S_COLOR_WHITE ")\n\"",
-						G_GetStringEdString( "MP_SVGAME", "PLDUELTIE" ),
-						ent->client->pers.netname,
-						duelAgainst->client->pers.netname
-					)
-				);
+				trap->SendServerCommand( -1, va( "print \"%s: %s " S_COLOR_WHITE "vs %s! " S_COLOR_WHITE "(" S_COLOR_RED
+					"%i" S_COLOR_WHITE "/" S_COLOR_GREEN "%i" S_COLOR_WHITE ")\n\"", G_GetStringEdString( "MP_SVGAME",
+					"PLDUELTIE" ), ent->client->pers.netname, duelAgainst->client->pers.netname ) );
 				trap->SendServerCommand( -1, va( "cp \"%s\n\"", G_GetStringEdString( "MP_SVGAME", "PLDUELTIE" ) ) );
 			}
 
@@ -3400,7 +3381,7 @@ static void G_SendScoreboardUpdate( gentity_t *ent ) {
 
 	if ( !Client_Supports( ent, CSF_SCOREBOARD_LARGE ) )
 		Q_capi( numSorted, MAX_CLIENT_SCORE_SEND );
-
+	
 	for ( i = 0; i < numSorted; i++ ) {
 		int ping;
 
@@ -3409,7 +3390,7 @@ static void G_SendScoreboardUpdate( gentity_t *ent ) {
 		ping = (cl->pers.connected == CON_CONNECTING) ? -1 : Q_clampi( 0, cl->ps.ping, 999 );
 		accuracy = (cl->accuracy_shots) ? cl->accuracy_hits * 100 / cl->accuracy_shots : 0;
 		perfect = (cl->ps.persistant[PERS_RANK] == 0 && cl->ps.persistant[PERS_KILLED] == 0);
-	
+
 		// base, no K/D
 		if ( !Client_Supports( ent, CSF_SCOREBOARD_KD ) ) {
 			Com_sprintf( entry,
@@ -3546,7 +3527,7 @@ void ClientEndFrame( gentity_t *ent ) {
 
 	// apply all the damage taken this frame
 	P_DamageFeedback( ent );
-
+	
 	if ( japp_showLaggingClients.integer ) {// add the EF_CONNECTION flag if we haven't gotten commands recently
 		if ( level.time - ent->client->lastCmdTime > 1000 )
 			ent->client->ps.eFlags |= EF_CONNECTION;
@@ -3557,7 +3538,7 @@ void ClientEndFrame( gentity_t *ent ) {
 	ent->client->ps.stats[STAT_HEALTH] = ent->health;	// FIXME: get rid of ent->health...
 
 	G_SetClientSound( ent );
-	
+
 	// set the latest infor
 	if ( g_smoothClients.integer ) {
 		BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qfalse );
