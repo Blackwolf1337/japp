@@ -3322,9 +3322,6 @@ void ClientSpawn( gentity_t *ent ) {
 			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
 		}
 		else {
-			//ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = japp_spawnItems.integer;
-			
-
 			for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++) {
 				if (japp_spawnItems.bits & (1 << i)) {
 					ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << i);
@@ -3424,7 +3421,8 @@ void ClientSpawn( gentity_t *ent ) {
 		ent->health = client->ps.stats[STAT_HEALTH] = 125;
 	}
 	else {
-		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH];
+		//ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH];
+		ent->health = client->ps.stats[STAT_HEALTH] = japp_spawnHealth.integer;
 	}
 
 	// Start with a small amount of armor as well.
@@ -3437,7 +3435,8 @@ void ClientSpawn( gentity_t *ent ) {
 		client->ps.stats[STAT_ARMOR] = 0;
 	}
 	else {
-		client->ps.stats[STAT_ARMOR] = client->ps.stats[STAT_MAX_HEALTH] * 0.25f;
+		//client->ps.stats[STAT_ARMOR] = client->ps.stats[STAT_MAX_HEALTH] * 0.25f;
+		client->ps.stats[STAT_ARMOR] = japp_spawnArmor.integer;
 	}
 
 	G_SetOrigin( ent, &spawn_origin );

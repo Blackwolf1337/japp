@@ -1652,6 +1652,10 @@ void ClientThink_real( gentity_t *ent ) {
 		Monk_On( ent );
 	}
 
+	if ( ent->client->pers.adminData.empowered ) {
+		ent->client->ps.eFlags |= EF_BODYPUSH;
+	}
+
 	// This code was moved here from clientThink to fix a problem with g_synchronousClients
 	// being set to 1 when in vehicles.
 	if ( ent->s.number < MAX_CLIENTS && ent->client->ps.m_iVehicleNum ) {//driving a vehicle
