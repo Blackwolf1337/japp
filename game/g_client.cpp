@@ -3258,7 +3258,7 @@ void ClientSpawn( gentity_t *ent ) {
 		for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++)
 		{
 			if (japp_spawnItems.bits & (1 << i)) {
-				ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << i);
+				ent->client->ps.stats[STAT_HOLDABLE_ITEMS] |= (1 << i);
 			}
 			client->ps.stats[STAT_HOLDABLE_ITEM] = (HI_NONE + 1);
 		}
@@ -3324,7 +3324,7 @@ void ClientSpawn( gentity_t *ent ) {
 		else {
 			for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++) {
 				if (japp_spawnItems.bits & (1 << i)) {
-					ent->client->ps.stats[STAT_HOLDABLE_ITEMS] ^= (1 << i);
+					ent->client->ps.stats[STAT_HOLDABLE_ITEMS] |= (1 << i);
 				}
 			}
 			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;

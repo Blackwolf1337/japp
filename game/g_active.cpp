@@ -2299,8 +2299,10 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 			else {// only respawn the winner
 				if ( ent->health > 0 && ent->client->ps.stats[STAT_HEALTH] > 0 ) {
-					ent->health = ent->client->ps.stats[STAT_HEALTH] = ent->client->ps.stats[STAT_MAX_HEALTH];
-					ent->client->ps.stats[STAT_ARMOR] = ent->client->ps.stats[STAT_MAX_HEALTH] * 0.25f;
+					//ent->health = ent->client->ps.stats[STAT_HEALTH] = ent->client->ps.stats[STAT_MAX_HEALTH];
+					//ent->client->ps.stats[STAT_ARMOR] = ent->client->ps.stats[STAT_MAX_HEALTH] * 0.25f;
+					ent->health = japp_spawnHealth.integer;
+					ent->client->ps.stats[STAT_ARMOR] = japp_spawnArmor.integer;
 
 					if ( g_spawnInvulnerability.integer ) {
 						ent->client->ps.eFlags |= EF_INVULNERABLE;
