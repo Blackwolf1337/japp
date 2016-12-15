@@ -2768,7 +2768,7 @@ void Cmd_EngageDuel_f( gentity_t *ent, bool fullforce ) {
 
 
 			if (fullforce) {
-				if (!(g_privateDuel.bits & PRIVDUEL_MULTI)) {
+				if (!(g_privateDuel.bits & PRIVDUEL_FULLFORCE)) {
 					trap->SendServerCommand(ent - g_entities, "print \"Fullforce duels not allowed!\n\"");
 					return;
 				}

@@ -3059,15 +3059,11 @@ void ClientThink_real( gentity_t *ent ) {
 	// Did we kick someone in our pmove sequence?
 	if ( japp_flipKick.integer && client->ps.forceKickFlip ) {
 		gentity_t *faceKicked = &g_entities[client->ps.forceKickFlip - 1];
+		int flipkickdmg = japp_flipKickDamage.integer;
 
-		if (faceKicked && faceKicked->client
-			&& (!OnSameTeam(ent, faceKicked) || g_friendlyFire.integer)
-			&& (!faceKicked->client->ps.duelInProgress || !faceKicked->client->ps.duelIndex == ent->s.number)
-			&& (!ent->client->ps.duelInProgress || !ent->client->ps.duelIndex == faceKicked->s.number))
+		if (faceKicked && faceKicked->client && (!OnSameTeam(ent, faceKicked) || g_friendlyFire.integer))
 			{
-			if (faceKicked->health > 0
-				&& faceKicked->takedamage
-				&& !(faceKicked->client->ps.eFlags & EF_INVULNERABLE))
+			if (faceKicked->health > 0 && faceKicked->takedamage && !(faceKicked->client->ps.eFlags & EF_INVULNERABLE))
 				{
 				// push them away and do pain
 				vector3 oppDir;
@@ -3075,8 +3071,15 @@ void ClientThink_real( gentity_t *ent ) {
 
 				VectorScale( &oppDir, -1, &oppDir );
 
-				if (japp_flipKickDamage.integer) {
-					G_Damage( faceKicked, ent, ent, &oppDir, &client->ps.origin, japp_flipKickDamage.integer, DAMAGE_NO_ARMOR, MOD_MELEE );
+				if (flipkickdmg) {
+					if (!japp_flipKickDamageInDuel.integer
+						&& (faceKicked->client->ps.duelInProgress || faceKicked->client->ps.duelIndex == ent->s.number)
+						&& (ent->client->ps.duelInProgress || ent->client->ps.duelIndex == faceKicked->s.number)) 
+					{
+						flipkickdmg = 0;
+					}
+
+					G_Damage( faceKicked, ent, ent, &oppDir, &client->ps.origin, flipkickdmg, DAMAGE_NO_ARMOR, MOD_MELEE );
 				}
 
 				if (faceKicked->client->ps.weapon != WP_SABER
@@ -3099,25 +3102,24 @@ void ClientThink_real( gentity_t *ent ) {
 							faceKicked->client->ps.forceHandExtendTime = level.time + 1100;
 							//this toggles between 1 and 0, when it's 1 we should play the get up anim
 							faceKicked->client->ps.forceDodgeAnim = 0;
-						}
+							}
 
-						faceKicked->client->ps.otherKiller = ent->s.number;
-						faceKicked->client->ps.otherKillerTime = level.time + 5000;
-						faceKicked->client->ps.otherKillerDebounceTime = level.time + 100;
+							faceKicked->client->ps.otherKiller = ent->s.number;
+							faceKicked->client->ps.otherKillerTime = level.time + 5000;
+							faceKicked->client->ps.otherKillerDebounceTime = level.time + 100;
 					
-						if (faceKicked->client->invulnerableSpecial) {
-							faceKicked->client->invulnerableTimer = level.time + 5000;
-							faceKicked->client->ps.eFlags |= EF_INVULNERABLE;
-						}
+							if (faceKicked->client->invulnerableSpecial) {
+								faceKicked->client->invulnerableTimer = level.time + 5000;
+								faceKicked->client->ps.eFlags |= EF_INVULNERABLE;
+							}
 
-						if (!faceKicked->client->invulnerableSpecial) {
-							faceKicked->client->ps.velocity.x = oppDir.x*(strength * 2);
-							faceKicked->client->ps.velocity.y = oppDir.y*(strength * 2);
-							faceKicked->client->ps.velocity.z = 200;
+							if (!faceKicked->client->invulnerableSpecial) {
+								faceKicked->client->ps.velocity.x = oppDir.x*(strength * 2);
+								faceKicked->client->ps.velocity.y = oppDir.y*(strength * 2);
+								faceKicked->client->ps.velocity.z = 200;
+							}
 						}
-
 					}
-				}
 
 				const char *soundPath = va("sound/weapons/melee/punch%d", Q_irand(1, 4));
 				G_Sound(faceKicked, CHAN_AUTO, G_SoundIndex(soundPath));

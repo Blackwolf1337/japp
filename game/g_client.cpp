@@ -2512,7 +2512,6 @@ void ClientBegin( int clientNum, qboolean allowTeamReset ) {
 		if ( level.gametype == GT_SIEGE && (!gSiegeRoundBegun || gSiegeRoundEnded) ) {
 			SetTeamQuick( ent, TEAM_SPECTATOR, qfalse );
 		}
-
 		// locate ent at a spawn point
 		ClientSpawn( ent );
 
@@ -3255,13 +3254,15 @@ void ClientSpawn( gentity_t *ent ) {
 			}
 		}
 
-		for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++)
+		for (int i = HI_SEEKER; i <= (HI_NUM_HOLDABLE - 1); i++)
 		{
 			if (japp_spawnItems.bits & (1 << i)) {
 				ent->client->ps.stats[STAT_HOLDABLE_ITEMS] |= (1 << i);
 			}
-			client->ps.stats[STAT_HOLDABLE_ITEM] = (HI_NONE + 1);
+			else
+				continue;
 		}
+		//client->ps.stats[STAT_HOLDABLE_ITEM] = 0;
 	}
 
 	else if ( client->siegeClass != -1 && client->sess.sessionTeam != TEAM_SPECTATOR ) {
@@ -3321,18 +3322,24 @@ void ClientSpawn( gentity_t *ent ) {
 			ent->client->ps.stats[STAT_HOLDABLE_ITEMS] = ((1 << HI_NUM_HOLDABLE) - 1) & ~1;
 			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
 		}
-		else {
-			for (int i = HI_NONE; i < (HI_NUM_HOLDABLE - 1); i++) {
+		else 
+		{
+			
+			for (int i = HI_NONE; i <= (HI_NUM_HOLDABLE - 1); i++) {
 				if (japp_spawnItems.bits & (1 << i)) {
 					ent->client->ps.stats[STAT_HOLDABLE_ITEMS] |= (1 << i);
 				}
+				else 
+					continue;
 			}
-			ent->client->ps.stats[STAT_HOLDABLE_ITEM] = HI_NONE + 1;
+			//ent->client->ps.stats[STAT_HOLDABLE_ITEM] = 0;
+
+			
 
 			/*uint32_t x = client->ps.stats[STAT_HOLDABLE_ITEMS];
 			// get the right-most bit
 			x &= -x;
-			// log2n of x is array index of bit-value
+			// log2n of x is array index of bit-value	
 			x = (x >= 1000000000)
 				? 9 : (x >= 100000000)
 				? 8 : (x >= 10000000)
