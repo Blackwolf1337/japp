@@ -1,4 +1,4 @@
-# This branch has been dropped and is not supported by the forker
+# This whole forked japp has been dropped and is not supported by the forker
 
 japp
 ====
